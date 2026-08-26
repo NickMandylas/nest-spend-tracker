@@ -4,12 +4,21 @@ Nest is a local-first Australian household finance workspace for monitoring ever
 
 ## Platform
 
+### Overview
 
-|                                                                                                                  |                                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **Overview** ![Nest overview with fictional balances, spending, and debt outlook](docs/screenshots/overview.png) | **Activity** ![Nest transaction activity table with fictional merchants and accounts](docs/screenshots/activity.jpg) |
-| **Forecast** ![Nest property-loan forecast calculator with fictional assumptions](docs/screenshots/forecast.jpg) | **Net Worth** ![Nest household net-worth dashboard with a fictional property](docs/screenshots/net-worth.jpg)        |
+![Nest overview with fictional balances, spending, and debt outlook](docs/screenshots/overview.png)
 
+### Activity
+
+![Nest transaction activity table with fictional merchants and accounts](docs/screenshots/activity.jpg)
+
+### Forecast
+
+![Nest property-loan forecast calculator with fictional assumptions](docs/screenshots/forecast.jpg)
+
+### Net Worth
+
+![Nest household net-worth dashboard with a fictional property](docs/screenshots/net-worth.jpg)
 
 > All screenshots use a fictional demonstration household. Names, addresses,
 > accounts, transactions, balances, and forecasts shown here are illustrative.
@@ -185,4 +194,3 @@ pnpm lint
 pnpm typecheck
 pnpm build
 ```
-
