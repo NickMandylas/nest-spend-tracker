@@ -2,6 +2,7 @@ import { DM_Sans, Geist_Mono } from "next/font/google"
 import Script from "next/script"
 
 import "./globals.css"
+import { FinanceChatProvider } from "@/components/finance-chat-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +35,9 @@ export default function RootLayout({
         <Script id="disable-openui-devtools" strategy="beforeInteractive">
           {`globalThis[Symbol.for("openui.devtools.autoMount")] = true;`}
         </Script>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <FinanceChatProvider>{children}</FinanceChatProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -34,6 +34,7 @@ export async function renameAccount(
   revalidatePath("/activity")
   revalidatePath("/net-worth")
   revalidatePath("/forecast")
+  revalidatePath("/settings")
 
   return { ok: true, displayName }
 }

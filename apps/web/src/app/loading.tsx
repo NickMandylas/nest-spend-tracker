@@ -3,6 +3,8 @@ import {
   IconLayoutDashboard,
   IconListDetails,
   IconPigMoney,
+  IconScale,
+  IconSettings,
 } from "@tabler/icons-react"
 
 function SkeletonLine({ className = "" }: { className?: string }) {
@@ -11,8 +13,10 @@ function SkeletonLine({ className = "" }: { className?: string }) {
 
 const navigation = [
   { label: "Overview", icon: IconLayoutDashboard, active: true },
+  { label: "Net Worth", icon: IconScale, active: false },
   { label: "Forecast", icon: IconChartLine, active: false },
   { label: "Activity", icon: IconListDetails, active: false },
+  { label: "Settings", icon: IconSettings, active: false },
 ]
 
 export default function Loading() {
@@ -56,11 +60,11 @@ export default function Loading() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 border-t border-border px-3 py-1.5 sm:px-5 lg:hidden">
+        <nav className="flex items-center gap-1 overflow-x-auto border-t border-border px-3 py-1.5 sm:px-5 lg:hidden">
           {navigation.map((item) => (
             <div
               key={item.label}
-              className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium ${
+              className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium ${
                 item.active
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground"

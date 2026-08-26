@@ -28,6 +28,7 @@ import {
   IconPresentationAnalytics,
   IconRefresh,
   IconScale,
+  IconSettings,
   IconSparkles,
   IconSun,
   IconTargetArrow,
@@ -41,10 +42,11 @@ import {
   type BudgetCategoryOption,
 } from "@/components/budget-dialog"
 import { ForecastCalculator } from "@/components/forecast-calculator"
-import { FinanceChatShell } from "@/components/finance-chat-shell"
+import { useFinanceChat } from "@/components/finance-chat-provider"
 import { InstitutionLogo } from "@/components/institution-logo"
 import { MerchantLogo } from "@/components/merchant-logo"
 import { NetWorthDashboard } from "@/components/net-worth-dashboard"
+import { SettingsPanel } from "@/components/settings-panel"
 import { TransactionDetailsSheet } from "@/components/transaction-details-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -79,7 +81,7 @@ import type { FinancialSnapshot, Transaction } from "@/lib/redbark-types"
 
 type TimeRange = "7d" | "30d" | "120d"
 type DashboardView =
-  "overview" | "net-worth" | "forecast" | "activity" | "dashboard"
+  "overview" | "net-worth" | "forecast" | "activity" | "settings" | "dashboard"
 
 type SpendCategory = {
   category: string
@@ -167,6 +169,12 @@ const NAV_ITEMS = [
     href: "/activity",
     icon: IconListDetails,
     view: "activity",
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: IconSettings,
+    view: "settings",
   },
 ]
 
@@ -849,6 +857,7 @@ export function SpendDashboard({
 }) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
+  const { isOpen: isChatOpen, openChat } = useFinanceChat()
   const isThemeMounted = React.useSyncExternalStore(
     subscribeToClientRender,
     () => true,
@@ -860,7 +869,6 @@ export function SpendDashboard({
   const [selectedSpendCategory, setSelectedSpendCategory] =
     React.useState("all")
   const [activeBudgets, setActiveBudgets] = React.useState(budgets)
-  const [isChatOpen, setIsChatOpen] = React.useState(true)
   const [selectedOverviewTransaction, setSelectedOverviewTransaction] =
     React.useState<Transaction | null>(null)
   const isDashboardView = view === "dashboard"
@@ -1046,7 +1054,7 @@ export function SpendDashboard({
   }
 
   return (
-    <FinanceChatShell open={isChatOpen} onClose={() => setIsChatOpen(false)}>
+    <>
       <main className="min-h-full min-w-0 overflow-hidden">
         {!isDashboardView && (
           <header className="sticky top-0 z-40 border-b border-border bg-background">
@@ -1158,7 +1166,7 @@ export function SpendDashboard({
                         type="button"
                         variant="outline"
                         size="icon-lg"
-                        onClick={() => setIsChatOpen(true)}
+                        onClick={openChat}
                         aria-label="Open Nest assistant"
                         aria-controls="finance-chat-panel"
                         className="rounded-md transition-[background-color,color,scale] duration-150 ease-out active:scale-[0.96]"
@@ -1214,7 +1222,18 @@ export function SpendDashboard({
             </div>
           )}
 
-          {view === "activity" ? (
+          {view === "settings" ? (
+            <SettingsPanel
+              snapshot={snapshot}
+              preferences={preferences}
+              budgets={activeBudgets}
+              categories={budgetCategories}
+              onBudgetsSaved={setActiveBudgets}
+              isRefreshing={isRefreshing}
+              refreshError={refreshError}
+              onRefresh={refresh}
+            />
+          ) : view === "activity" ? (
             <ActivityDataTable snapshot={snapshot} preferences={preferences} />
           ) : view === "net-worth" && netWorthProfile ? (
             <NetWorthDashboard
@@ -1950,6 +1969,6 @@ export function SpendDashboard({
           onTransactionChange={setSelectedOverviewTransaction}
         />
       </main>
-    </FinanceChatShell>
+    </>
   )
 }
