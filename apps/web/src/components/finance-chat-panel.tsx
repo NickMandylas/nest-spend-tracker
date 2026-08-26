@@ -202,7 +202,7 @@ function ToolCallTrace({ part }: { part: EveDynamicToolPart }) {
 
   return (
     <div
-      className="flex items-start gap-2.5 rounded-lg bg-muted/50 px-3 py-2.5 text-muted-foreground"
+      className="flex w-full items-start gap-2.5 rounded-lg bg-muted/50 px-3 py-2.5 text-muted-foreground"
       data-tool-state={part.state}
     >
       <span
@@ -539,7 +539,7 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                   className={
                     message.role === "user"
                       ? "ml-8 max-w-[88%] self-end rounded-lg bg-foreground px-3.5 py-2.5 text-background"
-                      : "mr-2 space-y-2.5 self-start"
+                      : "w-full space-y-2.5 self-start pr-2"
                   }
                 >
                   {visibleParts.map((part, index) => (
@@ -627,9 +627,6 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </form>
-        <p className="mt-1.5 text-center text-[0.58rem] text-muted-foreground">
-          Read-only · answers use your cached household data
-        </p>
       </div>
     </aside>
   )
