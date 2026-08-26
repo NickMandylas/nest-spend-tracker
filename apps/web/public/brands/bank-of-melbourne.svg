@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Bank of Melbourne">
+  <rect width="64" height="64" rx="12" fill="#fff"/>
+  <path d="M12 25.5 32 13l20 12.5v4H12v-4Z" fill="#d71920"/>
+  <path d="M16 32h7v16h-7V32Zm12.5 0h7v16h-7V32ZM41 32h7v16h-7V32Z" fill="#d71920"/>
+  <path d="M12 51h40v4H12v-4Z" fill="#d71920"/>
+</svg>

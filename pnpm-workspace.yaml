@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+
+allowBuilds:
+  node: true
+  sharp: true
+  unrs-resolver: true
+  msw: false

@@ -1,0 +1,28 @@
+{
+  "name": "nest-spend-tracker",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @nest/web dev",
+    "build": "pnpm --filter @nest/web build",
+    "start": "pnpm --filter @nest/web start",
+    "lint": "pnpm --filter @nest/web lint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @nest/web db:generate",
+    "db:migrate": "pnpm --filter @nest/web db:migrate",
+    "db:studio": "pnpm --filter @nest/web db:studio",
+    "agent:build": "pnpm --filter @nest/agent build",
+    "agent:info": "pnpm --filter @nest/agent info"
+  },
+  "devDependencies": {
+    "node": "^24.19.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=24"
+  }
+}

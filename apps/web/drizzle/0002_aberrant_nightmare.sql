@@ -1,0 +1,1 @@
+ALTER TABLE `properties` ADD `monthly_take_home_income_minor` integer;
