@@ -357,6 +357,7 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
   const isBusy = agent.status === "submitted" || agent.status === "streaming"
   const messages = agent.data.messages
   const hasMessages = messages.length > 0
+  const send = agent.send
 
   React.useEffect(() => {
     const conversation = conversationRef.current
@@ -369,14 +370,13 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
       if (!message) return
 
       setDraft("")
-      void agent
-        .send(message, {
-          ...(isBusy ? { turnPolicy: "steer" as const } : {}),
-          ...(clientContext ? { clientContext } : {}),
-        })
+      void send(message, {
+        ...(isBusy ? { turnPolicy: "steer" as const } : {}),
+        ...(clientContext ? { clientContext } : {}),
+      })
         .catch(() => {})
     },
-    [agent, isBusy]
+    [isBusy, send]
   )
 
   const handleOpenUIAction = React.useCallback(

@@ -6,7 +6,42 @@ import {
   type ActionEvent,
   type OpenUIError,
 } from "@openuidev/react-lang"
-import { openuiChatLibrary } from "@openuidev/react-ui/genui-lib"
+import {
+  openuiChatLibrary,
+  ThemeProvider as OpenUIThemeProvider,
+  type Theme as OpenUITheme,
+} from "@openuidev/react-ui"
+import { useTheme } from "next-themes"
+
+const LIGHT_CHART_PALETTE = [
+  "#0891b2",
+  "#ea580c",
+  "#7c3aed",
+  "#2563eb",
+  "#16a34a",
+  "#d97706",
+  "#db2777",
+  "#475569",
+]
+
+const DARK_CHART_PALETTE = [
+  "#22d3ee",
+  "#fb923c",
+  "#a78bfa",
+  "#60a5fa",
+  "#22c55e",
+  "#fbbf24",
+  "#f472b6",
+  "#94a3b8",
+]
+
+const LIGHT_OPENUI_THEME: OpenUITheme = {
+  defaultChartPalette: LIGHT_CHART_PALETTE,
+}
+
+const DARK_OPENUI_THEME: OpenUITheme = {
+  defaultChartPalette: DARK_CHART_PALETTE,
+}
 
 const OPENUI_FENCE = /^```(?:openui(?:-lang)?|ui)?[\t ]*\n?/i
 
@@ -35,25 +70,51 @@ export function OpenUIMessage({
   isStreaming: boolean
   onAction: (event: ActionEvent) => void
 }) {
-  const [errors, setErrors] = React.useState<OpenUIError[]>([])
+  const { resolvedTheme } = useTheme()
+  const [hasErrors, setHasErrors] = React.useState(false)
   const program = extractOpenUIProgram(content, isStreaming)
 
+  const handleErrors = React.useCallback((errors: OpenUIError[]) => {
+    const nextHasErrors = errors.length > 0
+    setHasErrors((currentHasErrors) =>
+      currentHasErrors === nextHasErrors ? currentHasErrors : nextHasErrors
+    )
+  }, [])
+
   if (!program) return null
+
+  if (isStreaming) {
+    return (
+      <div
+        className="nest-openui min-w-0 px-3 py-2 text-[0.68rem] text-muted-foreground"
+        aria-live="polite"
+      >
+        Building interactive view…
+      </div>
+    )
+  }
 
   return (
     <div
       className="nest-openui min-w-0 overflow-hidden px-3"
       data-openui-message
     >
-      <Renderer
-        library={openuiChatLibrary}
-        response={program}
-        isStreaming={isStreaming}
-        onAction={onAction}
-        onError={setErrors}
-        publishObservability={false}
-      />
-      {!isStreaming && errors.length > 0 ? (
+      <OpenUIThemeProvider
+        mode={resolvedTheme === "dark" ? "dark" : "light"}
+        lightTheme={LIGHT_OPENUI_THEME}
+        darkTheme={DARK_OPENUI_THEME}
+        cssSelector=".nest-openui"
+      >
+        <Renderer
+          library={openuiChatLibrary}
+          response={program}
+          isStreaming={false}
+          onAction={onAction}
+          onError={handleErrors}
+          publishObservability={false}
+        />
+      </OpenUIThemeProvider>
+      {hasErrors ? (
         <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-[0.62rem] leading-relaxed text-pretty text-destructive">
           This interactive response could not be fully rendered. Ask Nest to
           retry it.

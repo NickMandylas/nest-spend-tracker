@@ -1,0 +1,151 @@
+diff --git a/dist/src/react/use-eve-agent.js b/dist/src/react/use-eve-agent.js
+index 4ce76a49a3331d4db65c7f6ba932dddade832246..a10bc51a90a9abd1dabd3a8af11e4000d621ccc2 100644
+--- a/dist/src/react/use-eve-agent.js
++++ b/dist/src/react/use-eve-agent.js
+@@ -1 +1,144 @@
+-import{EveAgentStore,detachEveAgentStore}from"#client/eve-agent-store.js";import{defaultMessageReducer}from"#client/message-reducer.js";import{useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore}from"react";import{resolveEveAgentHost}from"#client/agent-host.js";function useEveAgent(n={}){let r=useRef(void 0),i=useRef(n.resume??!1),[a,o]=useState(i.current);if(!r.current){if(i.current&&n.initialSession===void 0&&n.session===void 0)throw Error(`useEveAgent({ resume: true }) requires initialSession or session.`);let t=n.reducer??defaultMessageReducer();r.current=new EveAgentStore({auth:n.auth,headers:n.headers,host:resolveEveAgentHost({agent:n.agent,host:n.host}),initialEvents:n.initialEvents,initialSession:n.initialSession,optimistic:n.optimistic,reducer:t,session:n.session})}let s=r.current;s.setCallbacks({onError:n.onError,onEvent:n.onEvent,onFinish:n.onFinish,onSessionChange:n.onSessionChange,prepareSend:n.prepareSend});let c=useSyncExternalStore(useCallback(e=>s.subscribe(e),[s]),()=>s.snapshot,()=>s.snapshot);useEffect(()=>()=>detachEveAgentStore(s),[s]),useEffect(()=>{if(!i.current)return;let e=!0,finish=()=>{e&&o(!1)},t=setTimeout(()=>void s.resume().then(finish,finish),0);return()=>{e=!1,clearTimeout(t)}},[s]);let l=useCallback(()=>s.cancel(),[s]),u=useCallback(()=>s.reset(),[s]),d=useCallback(()=>s.resume(),[s]),f=useCallback((e,t)=>s.send({...t,message:e}),[s]),p=useCallback((e,t)=>s.send({...t,inputResponses:e}),[s]),m=a&&c.status===`ready`?{...c,status:`submitted`}:c;return useMemo(()=>({...m,cancel:l,reset:u,respond:p,resume:d,send:f}),[l,u,p,d,f,m])}export{useEveAgent};
+\ No newline at end of file
++import {
++  EveAgentStore,
++  detachEveAgentStore,
++} from "#client/eve-agent-store.js"
++import { defaultMessageReducer } from "#client/message-reducer.js"
++import {
++  useCallback,
++  useEffect,
++  useMemo,
++  useRef,
++  useState,
++  useSyncExternalStore,
++} from "react"
++import { resolveEveAgentHost } from "#client/agent-host.js"
++
++const STORE_NOTIFICATION_INTERVAL_MS = 16
++
++function subscribeToStore(store, notify) {
++  let pendingNotification
++
++  const unsubscribe = store.subscribe(() => {
++    if (pendingNotification !== undefined) return
++
++    pendingNotification = setTimeout(() => {
++      pendingNotification = undefined
++      notify()
++    }, STORE_NOTIFICATION_INTERVAL_MS)
++  })
++
++  return () => {
++    unsubscribe()
++    if (pendingNotification !== undefined) {
++      clearTimeout(pendingNotification)
++    }
++  }
++}
++
++function useEveAgent(options = {}) {
++  const storeRef = useRef(undefined)
++  const shouldResumeRef = useRef(options.resume ?? false)
++  const [isResuming, setIsResuming] = useState(shouldResumeRef.current)
++
++  if (!storeRef.current) {
++    if (
++      shouldResumeRef.current &&
++      options.initialSession === undefined &&
++      options.session === undefined
++    ) {
++      throw new Error(
++        "useEveAgent({ resume: true }) requires initialSession or session."
++      )
++    }
++
++    const reducer = options.reducer ?? defaultMessageReducer()
++    storeRef.current = new EveAgentStore({
++      auth: options.auth,
++      headers: options.headers,
++      host: resolveEveAgentHost({
++        agent: options.agent,
++        host: options.host,
++      }),
++      initialEvents: options.initialEvents,
++      initialSession: options.initialSession,
++      optimistic: options.optimistic,
++      reducer,
++      session: options.session,
++    })
++  }
++
++  const store = storeRef.current
++  store.setCallbacks({
++    onError: options.onError,
++    onEvent: options.onEvent,
++    onFinish: options.onFinish,
++    onSessionChange: options.onSessionChange,
++    prepareSend: options.prepareSend,
++  })
++
++  const snapshot = useSyncExternalStore(
++    useCallback(
++      (notify) => subscribeToStore(store, notify),
++      [store]
++    ),
++    () => store.snapshot,
++    () => store.snapshot
++  )
++
++  useEffect(() => () => detachEveAgentStore(store), [store])
++  useEffect(() => {
++    if (!shouldResumeRef.current) return
++
++    let mounted = true
++    const finish = () => {
++      if (mounted) setIsResuming(false)
++    }
++    const timer = setTimeout(() => {
++      void store.resume().then(finish, finish)
++    }, 0)
++
++    return () => {
++      mounted = false
++      clearTimeout(timer)
++    }
++  }, [store])
++
++  const cancel = useCallback(() => store.cancel(), [store])
++  const reset = useCallback(() => store.reset(), [store])
++  const resume = useCallback(() => store.resume(), [store])
++  const send = useCallback(
++    (message, turnOptions) =>
++      store.send({
++        ...turnOptions,
++        message,
++      }),
++    [store]
++  )
++  const respond = useCallback(
++    (inputResponses, turnOptions) =>
++      store.send({
++        ...turnOptions,
++        inputResponses,
++      }),
++    [store]
++  )
++
++  const displayedSnapshot =
++    isResuming && snapshot.status === "ready"
++      ? { ...snapshot, status: "submitted" }
++      : snapshot
++
++  return useMemo(
++    () => ({
++      ...displayedSnapshot,
++      cancel,
++      reset,
++      respond,
++      resume,
++      send,
++    }),
++    [cancel, reset, respond, resume, send, displayedSnapshot]
++  )
++}
++
++export { useEveAgent }

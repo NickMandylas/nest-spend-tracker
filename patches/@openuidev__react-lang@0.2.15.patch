@@ -1,0 +1,78 @@
+diff --git a/dist/exports-Cab8UG5o.mjs b/dist/exports-Cab8UG5o.mjs
+index fb50f51d5deda1e33af77af5e077c86c14083cd7..712ddc8019d3ec0015f5474a8f46c6b2de9ce6db 100644
+--- a/dist/exports-Cab8UG5o.mjs
++++ b/dist/exports-Cab8UG5o.mjs
+@@ -663,7 +663,7 @@ var ElementErrorBoundary = class extends Component {
+ 	}
+ 	componentDidUpdate(prevProps) {
+ 		if (!this.state.hasError) this.lastValidChildren = this.props.children;
+-		if (this.state.hasError && prevProps.children !== this.props.children) this.setState({ hasError: false });
++		if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) this.setState({ hasError: false });
+ 	}
+ 	componentDidCatch(error) {
+ 		const name = this.props.componentName ?? "Unknown";
+@@ -704,6 +704,7 @@ function RenderNode({ node }) {
+ 	if (!Comp) return null;
+ 	return /* @__PURE__ */ jsx(ElementErrorBoundary, {
+ 		componentName: node.typeName,
++		resetKey: getElementResetKey(node),
+ 		onError: reportError,
+ 		children: /* @__PURE__ */ jsx(RenderNodeInner, {
+ 			el: node,
+@@ -711,6 +712,17 @@ function RenderNode({ node }) {
+ 		})
+ 	});
+ }
++function getElementResetKey(node) {
++	try {
++		return JSON.stringify([
++			node.typeName,
++			node.statementId,
++			node.props
++		]);
++	} catch {
++		return `${node.typeName}:${node.statementId ?? ""}`;
++	}
++}
+ /**
+ * Renders a resolved element using its renderer.
+ * Props are already evaluated by evaluate-tree — no AST awareness needed.
+diff --git a/dist/useFormValidation-DRIRKK5N.cjs b/dist/useFormValidation-DRIRKK5N.cjs
+index 1cca6b7059d59c70eed79bd9bdedcbcfaf233fa4..19b68eafff5b8993465cafb13477ab6b726c783e 100644
+--- a/dist/useFormValidation-DRIRKK5N.cjs
++++ b/dist/useFormValidation-DRIRKK5N.cjs
+@@ -686,7 +686,7 @@ var ElementErrorBoundary = class extends react.Component {
+ 	}
+ 	componentDidUpdate(prevProps) {
+ 		if (!this.state.hasError) this.lastValidChildren = this.props.children;
+-		if (this.state.hasError && prevProps.children !== this.props.children) this.setState({ hasError: false });
++		if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) this.setState({ hasError: false });
+ 	}
+ 	componentDidCatch(error) {
+ 		const name = this.props.componentName ?? "Unknown";
+@@ -727,6 +727,7 @@ function RenderNode({ node }) {
+ 	if (!Comp) return null;
+ 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ElementErrorBoundary, {
+ 		componentName: node.typeName,
++		resetKey: getElementResetKey(node),
+ 		onError: reportError,
+ 		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(RenderNodeInner, {
+ 			el: node,
+@@ -734,6 +735,17 @@ function RenderNode({ node }) {
+ 		})
+ 	});
+ }
++function getElementResetKey(node) {
++	try {
++		return JSON.stringify([
++			node.typeName,
++			node.statementId,
++			node.props
++		]);
++	} catch {
++		return `${node.typeName}:${node.statementId ?? ""}`;
++	}
++}
+ /**
+ * Renders a resolved element using its renderer.
+ * Props are already evaluated by evaluate-tree — no AST awareness needed.
