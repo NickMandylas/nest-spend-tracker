@@ -44,6 +44,7 @@ const DARK_OPENUI_THEME: OpenUITheme = {
 }
 
 const OPENUI_FENCE = /^```(?:openui(?:-lang)?|ui)?[\t ]*\n?/i
+const INLINE_DATA_URL = /data:[a-z]+\/[a-z0-9.+-]+(?:;[^,\s"']*)?,/i
 
 export function extractOpenUIProgram(
   content: string,
@@ -73,6 +74,7 @@ export function OpenUIMessage({
   const { resolvedTheme } = useTheme()
   const [hasErrors, setHasErrors] = React.useState(false)
   const program = extractOpenUIProgram(content, isStreaming)
+  const containsInlineDataUrl = program ? INLINE_DATA_URL.test(program) : false
 
   const handleErrors = React.useCallback((errors: OpenUIError[]) => {
     const nextHasErrors = errors.length > 0
@@ -82,6 +84,27 @@ export function OpenUIMessage({
   }, [])
 
   if (!program) return null
+
+  // Uploaded files already have a first-class transcript preview. Rendering
+  // model-echoed data URLs is both redundant and unsafe while streaming: every
+  // partial base64 prefix would otherwise mount as a broken image and emit a
+  // browser error. The agent prompt also forbids producing these going forward.
+  if (containsInlineDataUrl) {
+    return isStreaming ? (
+      <div
+        className="nest-openui min-w-0 overflow-hidden px-3"
+        data-openui-message
+        data-openui-streaming="true"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <div className="nest-openui-stream-status" role="status">
+          <span className="nest-openui-stream-dot" aria-hidden="true" />
+          <span>Composing view…</span>
+        </div>
+      </div>
+    ) : null
+  }
 
   return (
     <div
