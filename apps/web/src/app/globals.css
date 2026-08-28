@@ -242,6 +242,26 @@
   animation: nest-agent-trace-shimmer 1.4s linear infinite;
 }
 
+.nest-agent-loader-cell {
+  opacity: 0.14;
+  scale: 0.72;
+  animation: nest-agent-loader-pixel 650ms ease-in-out
+    var(--nest-agent-loader-delay, 0ms) infinite;
+}
+
+@keyframes nest-agent-loader-pixel {
+  0%,
+  58%,
+  100% {
+    opacity: 0.14;
+    scale: 0.72;
+  }
+  24% {
+    opacity: 0.92;
+    scale: 1;
+  }
+}
+
 @keyframes nest-agent-trace-shimmer {
   from {
     background-position: 100% 0;
@@ -254,8 +274,14 @@
 @media (prefers-reduced-motion: reduce) {
   .nest-openui-stream-dot,
   .nest-openui[data-openui-streaming="true"] .openui-card > *,
+  .nest-agent-loader-cell,
   .nest-agent-trace-shimmer {
     animation: none;
+  }
+
+  .nest-agent-loader-cell {
+    opacity: 0.38;
+    scale: 1;
   }
 
   .nest-agent-trace-shimmer {

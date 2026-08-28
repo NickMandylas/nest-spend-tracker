@@ -105,6 +105,7 @@ Then fill in `apps/web/.env.local`:
 REDBARK_API_KEY=rbk_live_your_key_here
 REDBARK_API_VERSION=2026-10-01.wattle
 AI_GATEWAY_API_KEY=vck_your_key_here
+FIRECRAWL_API_KEY=fc_your_key_here
 ```
 
 `REDBARK_API_KEY` supplies account and transaction data. See the
@@ -114,6 +115,11 @@ for account connection and API details.
 `AI_GATEWAY_API_KEY` is used by the Eve agent. You can run the finance
 dashboard without chatting to Nest, but assistant responses require a valid
 gateway credential.
+
+`FIRECRAWL_API_KEY` enables the assistant's read-only public web search and
+page-scraping tools. Create a key in [Firecrawl](https://www.firecrawl.dev/).
+The rest of the dashboard and the assistant's local finance tools work without
+it.
 
 ### 3. Initialise the local database
 

@@ -1,9 +1,14 @@
 import { DM_Sans, Geist_Mono } from "next/font/google"
+import { cookies } from "next/headers"
 import Script from "next/script"
 
 import "./globals.css"
 import { FinanceChatProvider } from "@/components/finance-chat-provider"
 import { ThemeProvider } from "@/components/theme-provider"
+import {
+  FINANCE_CHAT_COOKIE_NAME,
+  readFinanceChatOpenPreference,
+} from "@/lib/finance-chat-preferences"
 import { cn } from "@/lib/utils"
 
 const dmSans = DM_Sans({
@@ -16,11 +21,16 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const cookieStore = await cookies()
+  const defaultChatOpen = readFinanceChatOpenPreference(
+    cookieStore.get(FINANCE_CHAT_COOKIE_NAME)?.value
+  )
+
   return (
     <html
       lang="en"
@@ -36,7 +46,9 @@ export default function RootLayout({
           {`globalThis[Symbol.for("openui.devtools.autoMount")] = true;`}
         </Script>
         <ThemeProvider>
-          <FinanceChatProvider>{children}</FinanceChatProvider>
+          <FinanceChatProvider defaultOpen={defaultChatOpen}>
+            {children}
+          </FinanceChatProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -12,6 +12,7 @@ import type {
   SendTurnOptions,
 } from "eve/client"
 import { useEveAgent } from "eve/react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { useTheme } from "next-themes"
 import { Streamdown } from "streamdown"
 import {
@@ -31,6 +32,7 @@ import {
   type AgentActivityPart,
   isAgentActivityPart,
 } from "@/components/agent-activity-trace"
+import { AgentLoadingState } from "@/components/agent-loading-state"
 import { Aurora } from "@/components/aurora"
 import {
   extractOpenUIProgram,
@@ -47,6 +49,14 @@ const SUGGESTIONS = [
   "How is the offset changing our payoff date?",
   "What should we budget for next month?",
 ]
+
+const ACTIVE_TOOL_LABELS: Record<string, string> = {
+  get_household_overview: "Reading household data",
+  get_spending_summary: "Summarising spending",
+  search_transactions: "Searching transactions",
+  web_scrape: "Reading web source",
+  web_search: "Searching the web",
+}
 
 type SavedChat = {
   events?: readonly MessageStreamEvent[]
@@ -107,6 +117,60 @@ function shouldResumeSavedChat(saved: SavedChat) {
   return true
 }
 
+function activeWorkLabel(
+  messages: readonly { parts: readonly EveMessagePart[] }[],
+  status: "submitted" | "streaming"
+) {
+  if (status === "submitted") return "Starting response"
+
+  const parts = messages.flatMap((message) => message.parts)
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const part = parts[index]
+    if (part.type === "reasoning" && part.state === "streaming") {
+      return "Reasoning"
+    }
+    if (part.type === "text" && part.state === "streaming") {
+      return "Writing response"
+    }
+    if (
+      part.type === "dynamic-tool" &&
+      (part.state === "input-streaming" ||
+        part.state === "input-available" ||
+        (part.state === "output-available" && part.partial === true))
+    ) {
+      return ACTIVE_TOOL_LABELS[part.toolName] ?? "Running tool"
+    }
+  }
+
+  return "Waiting for next update"
+}
+
+function activeTurnKey(
+  messages: readonly { id: string; role: string }[],
+  fallback: string
+) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "user") return messages[index].id
+  }
+
+  return fallback
+}
+
+function activeAssistantMessageId(
+  messages: readonly { id: string; role: string }[],
+  isBusy: boolean
+) {
+  if (!isBusy) return null
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role === "assistant") return message.id
+    if (message.role === "user") return null
+  }
+
+  return null
+}
+
 function ChatStream({
   children,
   className = "text-foreground",
@@ -151,9 +215,7 @@ type AgentInputResponse = {
   readonly text?: string
 }
 
-function isPendingQuestionPart(
-  part: EveMessagePart
-): boolean {
+function isPendingQuestionPart(part: EveMessagePart): boolean {
   return (
     part.type === "dynamic-tool" &&
     part.state === "approval-requested" &&
@@ -318,7 +380,9 @@ function QuestionRequest({
                   setSelectedOptionId("")
                 }}
                 aria-label="Answer"
-                placeholder={hasOptions ? "Something else…" : "Type your answer…"}
+                placeholder={
+                  hasOptions ? "Something else…" : "Type your answer…"
+                }
                 className={`${hasOptions ? "mt-1.5" : ""} h-8 w-full rounded-md border border-input bg-background/60 px-2.5 text-[0.64rem] text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/25 disabled:opacity-50`}
               />
             ) : null}
@@ -469,6 +533,7 @@ function messageRenderItems(parts: readonly EveMessagePart[]) {
 
 export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
   const { resolvedTheme } = useTheme()
+  const reduceMotion = useReducedMotion()
   const [draft, setDraft] = React.useState("")
   const [saved] = React.useState<SavedChat>(readSavedChat)
   const conversationRef = React.useRef<HTMLDivElement>(null)
@@ -490,6 +555,11 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
   const isBusy = agent.status === "submitted" || agent.status === "streaming"
   const messages = agent.data.messages
   const hasMessages = messages.length > 0
+  const workLabel = isBusy
+    ? activeWorkLabel(messages, agent.status)
+    : "Waiting for next update"
+  const workKey = activeTurnKey(messages, agent.status)
+  const activeAssistantId = activeAssistantMessageId(messages, isBusy)
   const pendingQuestionPart = messages
     .flatMap((message) => message.parts)
     .find(
@@ -515,8 +585,7 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
       void send(message, {
         ...(isBusy ? { turnPolicy: "steer" as const } : {}),
         ...(clientContext ? { clientContext } : {}),
-      })
-        .catch(() => {})
+      }).catch(() => {})
     },
     [isBusy, send]
   )
@@ -625,7 +694,22 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
       >
         {!hasMessages ? (
           <div className="relative flex min-h-full flex-col justify-end overflow-hidden p-3">
-            <div
+            <motion.div
+              data-chat-aurora=""
+              initial={
+                reduceMotion
+                  ? false
+                  : {
+                      opacity: 0,
+                      y: -28,
+                    }
+              }
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                duration: 0.7,
+                bounce: 0,
+              }}
               className="absolute inset-x-0 top-0 h-44 overflow-hidden"
               style={{
                 maskImage:
@@ -638,7 +722,7 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                 blend={0.5}
                 speed={0.5}
               />
-            </div>
+            </motion.div>
 
             <div className="relative z-10">
               <div className="mb-3 space-y-0.5">
@@ -686,7 +770,11 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                 >
                   {renderItems.map((item) =>
                     item.kind === "activity" ? (
-                      <AgentActivityTrace key={item.key} parts={item.parts} />
+                      <AgentActivityTrace
+                        key={item.key}
+                        parts={item.parts}
+                        turnActive={message.id === activeAssistantId}
+                      />
                     ) : (
                       <MessagePart
                         key={item.key}
@@ -702,12 +790,25 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
               )
             })}
 
-            {agent.status === "submitted" ? (
-              <div className="mr-3 flex items-center gap-1.5 self-start text-[0.62rem] text-muted-foreground">
-                <IconSparkles className="size-3 animate-pulse" />
-                <span>Thinking…</span>
-              </div>
-            ) : null}
+            <AnimatePresence initial={false}>
+              {isBusy ? (
+                <motion.div
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  className="self-start"
+                  exit={{
+                    opacity: 0,
+                    y: -4,
+                    filter: "blur(4px)",
+                    transition: { duration: 0.15, ease: "easeIn" },
+                  }}
+                  initial={{ opacity: 0, y: 4, filter: "blur(4px)" }}
+                  key={workKey}
+                  transition={{ type: "spring", duration: 0.3, bounce: 0 }}
+                >
+                  <AgentLoadingState label={workLabel} />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         )}
       </div>

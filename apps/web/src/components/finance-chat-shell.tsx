@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { IconSparkles } from "@tabler/icons-react"
 
 import { FinanceChatPanel } from "@/components/finance-chat-panel"
 import {
@@ -22,7 +23,7 @@ function getDesktopLayoutSnapshot() {
 }
 
 function getServerDesktopLayoutSnapshot() {
-  return false
+  return true
 }
 
 function subscribeToClientRender() {
@@ -35,6 +36,43 @@ function getClientRenderSnapshot() {
 
 function getServerRenderSnapshot() {
   return false
+}
+
+function FinanceChatPanelLoading() {
+  return (
+    <aside
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-card"
+      aria-label="Nest assistant"
+    >
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-foreground">
+            <IconSparkles className="size-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold">Nest assistant</p>
+            <p className="truncate text-[0.6rem] text-muted-foreground">
+              Financial workspace
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1" aria-hidden="true">
+          <span className="size-7 rounded-md bg-muted/45" />
+          <span className="size-7 rounded-md bg-muted/45" />
+          <span className="size-7 rounded-md bg-muted/45" />
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 p-3">
+        <div className="h-full animate-pulse rounded-lg bg-muted/20" />
+      </div>
+
+      <div className="shrink-0 p-3 pt-0">
+        <div className="h-[4.75rem] rounded-xl border border-input bg-background" />
+      </div>
+    </aside>
+  )
 }
 
 export function FinanceChatShell({
@@ -91,7 +129,11 @@ export function FinanceChatShell({
             maxSize="42%"
           >
             <div className="h-full p-2 pl-0">
-              <FinanceChatPanel onClose={onClose} />
+              {isClient ? (
+                <FinanceChatPanel onClose={onClose} />
+              ) : (
+                <FinanceChatPanelLoading />
+              )}
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
