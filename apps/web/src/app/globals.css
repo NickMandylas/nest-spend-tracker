@@ -229,10 +229,37 @@
   }
 }
 
+.nest-agent-trace-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 30%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 70%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  animation: nest-agent-trace-shimmer 1.4s linear infinite;
+}
+
+@keyframes nest-agent-trace-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nest-openui-stream-dot,
-  .nest-openui[data-openui-streaming="true"] .openui-card > * {
+  .nest-openui[data-openui-streaming="true"] .openui-card > *,
+  .nest-agent-trace-shimmer {
     animation: none;
+  }
+
+  .nest-agent-trace-shimmer {
+    color: var(--foreground);
   }
 }
 

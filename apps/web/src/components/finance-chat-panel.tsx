@@ -16,11 +16,7 @@ import { useTheme } from "next-themes"
 import { Streamdown } from "streamdown"
 import {
   IconArrowUp,
-  IconBrain,
   IconCheck,
-  IconChevronDown,
-  IconDatabaseSearch,
-  IconExclamationCircle,
   IconHistory,
   IconMessageQuestion,
   IconPaperclip,
@@ -30,6 +26,11 @@ import {
   IconX,
 } from "@tabler/icons-react"
 
+import {
+  AgentActivityTrace,
+  type AgentActivityPart,
+  isAgentActivityPart,
+} from "@/components/agent-activity-trace"
 import { Aurora } from "@/components/aurora"
 import {
   extractOpenUIProgram,
@@ -142,18 +143,6 @@ function ChatStream({
       {children}
     </Streamdown>
   )
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  get_household_overview: "Read household overview",
-  get_spending_summary: "Summarise spending",
-  search_transactions: "Search transactions",
-}
-
-const TOOL_DESCRIPTIONS: Record<string, string> = {
-  get_household_overview: "Balances, budgets, property, loan and net worth",
-  get_spending_summary: "Everyday spending from the local cache",
-  search_transactions: "Matching transactions from the local cache",
 }
 
 type AgentInputResponse = {
@@ -354,142 +343,6 @@ function QuestionRequest({
   )
 }
 
-function toolInputSummary(part: EveDynamicToolPart) {
-  if (!part.input || typeof part.input !== "object") {
-    return TOOL_DESCRIPTIONS[part.toolName] ?? "Read-only local data"
-  }
-
-  const input = part.input as Record<string, unknown>
-  if (part.toolName === "get_spending_summary") {
-    const period =
-      typeof input.period === "string"
-        ? input.period.replaceAll("_", " ")
-        : "current month"
-    const groupBy =
-      typeof input.groupBy === "string" ? ` · by ${input.groupBy}` : ""
-    return `${period}${groupBy}`
-  }
-
-  if (part.toolName === "search_transactions") {
-    const details = [
-      typeof input.query === "string" ? `“${input.query}”` : null,
-      typeof input.accountName === "string" ? input.accountName : null,
-      typeof input.category === "string" ? input.category : null,
-      typeof input.dateFrom === "string" && typeof input.dateTo === "string"
-        ? `${input.dateFrom}–${input.dateTo}`
-        : null,
-    ].filter(Boolean)
-
-    return details.join(" · ") || TOOL_DESCRIPTIONS[part.toolName]
-  }
-
-  return TOOL_DESCRIPTIONS[part.toolName] ?? "Read-only local data"
-}
-
-function ToolCallTrace({ part }: { part: EveDynamicToolPart }) {
-  const complete = part.state === "output-available"
-  const failed = part.state === "output-error" || part.state === "output-denied"
-  const waiting =
-    part.state === "approval-requested" || part.state === "approval-responded"
-  const status = complete
-    ? "Complete"
-    : failed
-      ? part.state === "output-denied"
-        ? "Denied"
-        : "Failed"
-      : waiting
-        ? "Waiting"
-        : "Running"
-
-  return (
-    <div
-      className="flex w-full items-start gap-2.5 rounded-lg bg-muted/50 px-3 py-2.5 text-muted-foreground"
-      data-tool-state={part.state}
-    >
-      <span
-        className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md ${
-          failed
-            ? "bg-destructive/10 text-destructive"
-            : complete
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : "bg-background text-foreground"
-        }`}
-      >
-        {failed ? (
-          <IconExclamationCircle className="size-3" />
-        ) : complete ? (
-          <IconCheck className="size-3" />
-        ) : (
-          <IconDatabaseSearch className="size-3 animate-pulse" />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-[0.65rem] font-medium text-foreground">
-            {TOOL_LABELS[part.toolName] ?? part.toolName}
-          </p>
-          <span
-            className={`shrink-0 text-[0.56rem] font-medium ${
-              failed
-                ? "text-destructive"
-                : complete
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-muted-foreground"
-            }`}
-          >
-            {status}
-          </span>
-        </div>
-        <p className="mt-0.5 truncate text-[0.58rem] text-muted-foreground">
-          {toolInputSummary(part)}
-        </p>
-        {part.state === "output-error" ? (
-          <p className="mt-1 text-[0.58rem] text-pretty text-destructive">
-            {part.errorText}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-function ReasoningTrace({
-  part,
-}: {
-  part: Extract<EveMessagePart, { type: "reasoning" }>
-}) {
-  const isStreaming = part.state === "streaming"
-  const [open, setOpen] = React.useState(isStreaming)
-
-  return (
-    <details
-      className="group rounded-lg bg-muted/35 px-3 py-2.5 text-muted-foreground"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-    >
-      <summary
-        className="flex cursor-pointer list-none items-center gap-1.5 text-[0.62rem] font-medium text-foreground [&::-webkit-details-marker]:hidden"
-        title="Model-provided reasoning summary"
-      >
-        <IconBrain className="size-3.5 text-muted-foreground" />
-        <span>Reasoning summary</span>
-        {isStreaming ? (
-          <span className="ml-auto text-[0.55rem] font-normal text-muted-foreground">
-            Thinking…
-          </span>
-        ) : (
-          <IconChevronDown className="ml-auto size-3 transition-transform duration-150 ease-out group-open:rotate-180" />
-        )}
-      </summary>
-      <div className="mt-1.5">
-        <ChatStream compact streaming={part.state === "streaming"}>
-          {part.text}
-        </ChatStream>
-      </div>
-    </details>
-  )
-}
-
 function MessagePart({
   part,
   isUser = false,
@@ -529,14 +382,6 @@ function MessagePart({
     )
   }
 
-  if (part.type === "reasoning") {
-    return (
-      <ReasoningTrace
-        key={part.state === "streaming" ? "streaming" : "complete"}
-        part={part}
-      />
-    )
-  }
   if (part.type === "dynamic-tool") {
     const inputRequest = part.toolMetadata?.eve?.inputRequest
     if (inputRequest?.kind === "question") {
@@ -552,10 +397,74 @@ function MessagePart({
         />
       )
     }
-
-    return <ToolCallTrace part={part} />
   }
   return null
+}
+
+type MessageRenderItem =
+  | {
+      key: string
+      kind: "activity"
+      parts: readonly AgentActivityPart[]
+    }
+  | {
+      index: number
+      key: string
+      kind: "part"
+      part: EveMessagePart
+    }
+
+function messageRenderItems(parts: readonly EveMessagePart[]) {
+  const items: MessageRenderItem[] = []
+  let activityParts: AgentActivityPart[] = []
+
+  const flushActivity = () => {
+    if (activityParts.length === 0) return
+
+    const first = activityParts[0]
+    const last = activityParts.at(-1)
+    items.push({
+      key: `activity-${first?.stepIndex ?? 0}-${
+        last?.type === "dynamic-tool" ? last.toolCallId : activityParts.length
+      }`,
+      kind: "activity",
+      parts: activityParts,
+    })
+    activityParts = []
+  }
+
+  parts.forEach((part, index) => {
+    if (
+      (part.type === "reasoning" || part.type === "dynamic-tool") &&
+      isAgentActivityPart(part)
+    ) {
+      activityParts.push(part)
+      return
+    }
+
+    if (part.type === "step-start") return
+    flushActivity()
+
+    const isVisibleQuestion =
+      part.type === "dynamic-tool" &&
+      part.toolMetadata?.eve?.inputRequest?.kind === "question" &&
+      !isPendingQuestionPart(part)
+
+    if (part.type !== "text" && !isVisibleQuestion) return
+
+    items.push({
+      index,
+      key:
+        part.type === "dynamic-tool"
+          ? part.toolCallId
+          : `${part.type}-${part.stepIndex ?? 0}-${index}`,
+      kind: "part",
+      part,
+    })
+  })
+
+  flushActivity()
+  return items
 }
 
 export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
@@ -760,17 +669,11 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="flex min-h-full flex-col gap-4 px-3.5 py-4">
+          <div className="flex min-h-full flex-col gap-5 px-3.5 py-4">
             {messages.map((message) => {
-              const visibleParts = message.parts.filter(
-                (part) =>
-                  part.type === "text" ||
-                  part.type === "reasoning" ||
-                  (part.type === "dynamic-tool" &&
-                    !isPendingQuestionPart(part))
-              )
+              const renderItems = messageRenderItems(message.parts)
 
-              if (visibleParts.length === 0) return null
+              if (renderItems.length === 0) return null
 
               return (
                 <div
@@ -778,25 +681,23 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                   className={
                     message.role === "user"
                       ? "ml-8 max-w-[88%] self-end rounded-lg bg-foreground px-3.5 py-2.5 text-background"
-                      : "w-full space-y-2.5 self-start pr-2"
+                      : "w-full space-y-4 self-start pr-2"
                   }
                 >
-                  {visibleParts.map((part, index) => (
-                    <MessagePart
-                      key={
-                        part.type === "dynamic-tool"
-                          ? part.toolCallId
-                          : `${part.type}-${
-                              "stepIndex" in part ? (part.stepIndex ?? 0) : 0
-                            }-${index}`
-                      }
-                      part={part}
-                      isUser={message.role === "user"}
-                      canRespond={agent.status === "ready"}
-                      onInputResponses={handleInputResponses}
-                      onOpenUIAction={handleOpenUIAction}
-                    />
-                  ))}
+                  {renderItems.map((item) =>
+                    item.kind === "activity" ? (
+                      <AgentActivityTrace key={item.key} parts={item.parts} />
+                    ) : (
+                      <MessagePart
+                        key={item.key}
+                        part={item.part}
+                        isUser={message.role === "user"}
+                        canRespond={agent.status === "ready"}
+                        onInputResponses={handleInputResponses}
+                        onOpenUIAction={handleOpenUIAction}
+                      />
+                    )
+                  )}
                 </div>
               )
             })}
