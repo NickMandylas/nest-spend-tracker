@@ -83,21 +83,13 @@ export function OpenUIMessage({
 
   if (!program) return null
 
-  if (isStreaming) {
-    return (
-      <div
-        className="nest-openui min-w-0 px-3 py-2 text-[0.68rem] text-muted-foreground"
-        aria-live="polite"
-      >
-        Building interactive view…
-      </div>
-    )
-  }
-
   return (
     <div
       className="nest-openui min-w-0 overflow-hidden px-3"
       data-openui-message
+      data-openui-streaming={isStreaming ? "true" : undefined}
+      aria-busy={isStreaming}
+      aria-live="polite"
     >
       <OpenUIThemeProvider
         mode={resolvedTheme === "dark" ? "dark" : "light"}
@@ -108,13 +100,19 @@ export function OpenUIMessage({
         <Renderer
           library={openuiChatLibrary}
           response={program}
-          isStreaming={false}
+          isStreaming={isStreaming}
           onAction={onAction}
           onError={handleErrors}
           publishObservability={false}
         />
       </OpenUIThemeProvider>
-      {hasErrors ? (
+      {isStreaming ? (
+        <div className="nest-openui-stream-status" role="status">
+          <span className="nest-openui-stream-dot" aria-hidden="true" />
+          <span>Composing view…</span>
+        </div>
+      ) : null}
+      {!isStreaming && hasErrors ? (
         <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-[0.62rem] leading-relaxed text-pretty text-destructive">
           This interactive response could not be fully rendered. Ask Nest to
           retry it.

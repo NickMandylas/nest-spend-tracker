@@ -5,7 +5,9 @@ import type { ActionEvent } from "@openuidev/react-lang"
 import type {
   ClientSessionState,
   EveDynamicToolPart,
+  EveMessageInputRequest,
   EveMessagePart,
+  InputResponse,
   MessageStreamEvent,
   SendTurnOptions,
 } from "eve/client"
@@ -20,6 +22,7 @@ import {
   IconDatabaseSearch,
   IconExclamationCircle,
   IconHistory,
+  IconMessageQuestion,
   IconPaperclip,
   IconPlayerStop,
   IconPlus,
@@ -151,6 +154,204 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   get_household_overview: "Balances, budgets, property, loan and net worth",
   get_spending_summary: "Everyday spending from the local cache",
   search_transactions: "Matching transactions from the local cache",
+}
+
+type AgentInputResponse = {
+  readonly optionId?: string
+  readonly requestId: string
+  readonly text?: string
+}
+
+function isPendingQuestionPart(
+  part: EveMessagePart
+): boolean {
+  return (
+    part.type === "dynamic-tool" &&
+    part.state === "approval-requested" &&
+    part.toolMetadata?.eve?.inputRequest?.kind === "question" &&
+    part.toolMetadata.eve.inputResponse === undefined
+  )
+}
+
+function QuestionRequest({
+  canRespond,
+  inputRequest,
+  inputResponse,
+  onInputResponses,
+  placement = "message",
+}: {
+  canRespond: boolean
+  inputRequest: EveMessageInputRequest
+  inputResponse?: InputResponse
+  onInputResponses: (
+    responses: readonly AgentInputResponse[]
+  ) => void | Promise<void>
+  placement?: "composer" | "message"
+}) {
+  const [selectedOptionId, setSelectedOptionId] = React.useState("")
+  const [freeform, setFreeform] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+  const hasOptions = (inputRequest.options?.length ?? 0) > 0
+  const acceptsFreeform = inputRequest.allowFreeform === true || !hasOptions
+  const selectedOption = inputRequest.options?.find(
+    (option) => option.id === inputResponse?.optionId
+  )
+  const responseLabel =
+    selectedOption?.label ?? inputResponse?.text ?? inputResponse?.optionId
+  const answer = freeform.trim()
+  const canSubmit =
+    canRespond &&
+    !submitting &&
+    (selectedOptionId.length > 0 || answer.length > 0)
+
+  const submitResponse = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!canSubmit) return
+
+    setSubmitting(true)
+    const response: AgentInputResponse = {
+      requestId: inputRequest.requestId,
+      ...(selectedOptionId ? { optionId: selectedOptionId } : {}),
+      ...(answer ? { text: answer } : {}),
+    }
+
+    void Promise.resolve(onInputResponses([response])).catch(() => {
+      setSubmitting(false)
+    })
+  }
+
+  return (
+    <section
+      className={`overflow-hidden border ${
+        placement === "composer"
+          ? "animate-in rounded-xl border-input bg-background fade-in slide-in-from-bottom-1 duration-200"
+          : "rounded-lg border-border/80 bg-muted/35"
+      }`}
+      data-input-request={inputRequest.requestId}
+      data-input-request-state={inputResponse ? "responded" : "pending"}
+      data-question-placement={placement}
+    >
+      <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
+        <span className="grid size-5 shrink-0 place-items-center rounded-md bg-background text-foreground">
+          <IconMessageQuestion className="size-3" />
+        </span>
+        <p className="text-[0.62rem] font-medium text-foreground">
+          Nest needs one detail
+        </p>
+        <span className="ml-auto text-[0.54rem] font-medium text-muted-foreground">
+          {inputResponse ? "Answered" : "Your input"}
+        </span>
+      </div>
+
+      <div className="px-3 py-3">
+        <p className="text-[0.72rem] leading-relaxed font-medium text-pretty text-foreground">
+          {inputRequest.prompt}
+        </p>
+
+        {inputResponse ? (
+          <div className="mt-2.5 flex items-start gap-2 rounded-md bg-emerald-500/8 px-2.5 py-2 text-emerald-700 dark:text-emerald-400">
+            <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-emerald-500/12">
+              <IconCheck className="size-2.5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[0.55rem] font-medium tracking-wide uppercase opacity-75">
+                Answered
+              </p>
+              <p className="mt-0.5 text-[0.64rem] leading-relaxed text-pretty text-foreground">
+                {responseLabel ?? "Response sent"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <form className="mt-2.5" onSubmit={submitResponse}>
+            {hasOptions ? (
+              <div
+                className="grid gap-1.5"
+                role="radiogroup"
+                aria-label={inputRequest.prompt}
+              >
+                {inputRequest.options?.map((option) => {
+                  const selected = selectedOptionId === option.id
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={!canRespond || submitting}
+                      onClick={() => {
+                        setSelectedOptionId(option.id)
+                        setFreeform("")
+                      }}
+                      className={`group flex min-h-8 w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-[border-color,background-color,scale] duration-150 ease-out active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50 ${
+                        selected
+                          ? "border-foreground/25 bg-background"
+                          : "border-border/75 bg-background/35 hover:border-border hover:bg-background/70"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors ${
+                          selected
+                            ? "border-foreground bg-foreground"
+                            : "border-input bg-background"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <span
+                          className={`size-1 rounded-full bg-background transition-transform ${
+                            selected ? "scale-100" : "scale-0"
+                          }`}
+                        />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[0.64rem] leading-snug font-medium text-foreground">
+                          {option.label}
+                        </span>
+                        {option.description ? (
+                          <span className="mt-0.5 block text-[0.56rem] leading-relaxed text-pretty text-muted-foreground">
+                            {option.description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+
+            {acceptsFreeform ? (
+              <input
+                value={freeform}
+                disabled={!canRespond || submitting}
+                onChange={(event) => {
+                  setFreeform(event.target.value)
+                  setSelectedOptionId("")
+                }}
+                aria-label="Answer"
+                placeholder={hasOptions ? "Something else…" : "Type your answer…"}
+                className={`${hasOptions ? "mt-1.5" : ""} h-8 w-full rounded-md border border-input bg-background/60 px-2.5 text-[0.64rem] text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/25 disabled:opacity-50`}
+              />
+            ) : null}
+
+            <div className="mt-2.5 flex items-center justify-between gap-3">
+              <p className="text-[0.54rem] leading-relaxed text-muted-foreground">
+                The response will continue after your answer.
+              </p>
+              <Button
+                type="submit"
+                size="sm"
+                className="shrink-0 rounded-full px-3"
+                disabled={!canSubmit}
+              >
+                {submitting ? "Sending…" : "Answer"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </section>
+  )
 }
 
 function toolInputSummary(part: EveDynamicToolPart) {
@@ -292,10 +493,16 @@ function ReasoningTrace({
 function MessagePart({
   part,
   isUser = false,
+  canRespond,
+  onInputResponses,
   onOpenUIAction,
 }: {
   part: EveMessagePart
   isUser?: boolean
+  canRespond: boolean
+  onInputResponses: (
+    responses: readonly AgentInputResponse[]
+  ) => void | Promise<void>
   onOpenUIAction: (event: ActionEvent) => void
 }) {
   if (part.type === "text") {
@@ -330,7 +537,24 @@ function MessagePart({
       />
     )
   }
-  if (part.type === "dynamic-tool") return <ToolCallTrace part={part} />
+  if (part.type === "dynamic-tool") {
+    const inputRequest = part.toolMetadata?.eve?.inputRequest
+    if (inputRequest?.kind === "question") {
+      const inputResponse = part.toolMetadata?.eve?.inputResponse
+      if (!inputResponse) return null
+
+      return (
+        <QuestionRequest
+          canRespond={canRespond}
+          inputRequest={inputRequest}
+          inputResponse={inputResponse}
+          onInputResponses={onInputResponses}
+        />
+      )
+    }
+
+    return <ToolCallTrace part={part} />
+  }
   return null
 }
 
@@ -357,7 +581,16 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
   const isBusy = agent.status === "submitted" || agent.status === "streaming"
   const messages = agent.data.messages
   const hasMessages = messages.length > 0
+  const pendingQuestionPart = messages
+    .flatMap((message) => message.parts)
+    .find(
+      (part): part is EveDynamicToolPart =>
+        part.type === "dynamic-tool" && isPendingQuestionPart(part)
+    )
+  const pendingQuestionRequest =
+    pendingQuestionPart?.toolMetadata?.eve?.inputRequest
   const send = agent.send
+  const respond = agent.respond
 
   React.useEffect(() => {
     const conversation = conversationRef.current
@@ -408,6 +641,11 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
       )
     },
     [sendMessage]
+  )
+
+  const handleInputResponses = React.useCallback(
+    (responses: readonly AgentInputResponse[]) => respond(responses),
+    [respond]
   )
 
   const startNewChat = () => {
@@ -528,7 +766,8 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                 (part) =>
                   part.type === "text" ||
                   part.type === "reasoning" ||
-                  part.type === "dynamic-tool"
+                  (part.type === "dynamic-tool" &&
+                    !isPendingQuestionPart(part))
               )
 
               if (visibleParts.length === 0) return null
@@ -553,6 +792,8 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
                       }
                       part={part}
                       isUser={message.role === "user"}
+                      canRespond={agent.status === "ready"}
+                      onInputResponses={handleInputResponses}
                       onOpenUIAction={handleOpenUIAction}
                     />
                   ))}
@@ -577,56 +818,66 @@ export function FinanceChatPanel({ onClose }: { onClose: () => void }) {
           </p>
         ) : null}
 
-        <form
-          className="rounded-xl border border-input bg-background p-1.5 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25"
-          onSubmit={(event) => {
-            event.preventDefault()
-            sendMessage(draft)
-          }}
-        >
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault()
-                sendMessage(draft)
-              }
-            }}
-            placeholder="Ask Nest anything…"
-            className="min-h-14 w-full resize-none bg-transparent px-2 py-1.5 text-xs leading-relaxed outline-none placeholder:text-muted-foreground"
+        {pendingQuestionPart && pendingQuestionRequest?.kind === "question" ? (
+          <QuestionRequest
+            key={pendingQuestionPart.toolCallId}
+            canRespond={agent.status === "ready"}
+            inputRequest={pendingQuestionRequest}
+            onInputResponses={handleInputResponses}
+            placement="composer"
           />
-          <div className="flex items-end justify-between gap-2 px-0.5 pb-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              className="rounded-lg"
-              title="Attachments are not available yet"
-              aria-label="Attachments are not available yet"
-            >
-              <IconPaperclip />
-            </Button>
-            <Button
-              type={isBusy ? "button" : "submit"}
-              size="icon-sm"
-              className="rounded-full"
-              disabled={!isBusy && !draft.trim()}
-              onClick={
-                isBusy
-                  ? () => {
-                      void agent.cancel().catch(() => {})
-                    }
-                  : undefined
-              }
-              title={isBusy ? "Stop response" : "Send message"}
-              aria-label={isBusy ? "Stop response" : "Send message"}
-            >
-              {isBusy ? <IconPlayerStop /> : <IconArrowUp />}
-            </Button>
-          </div>
-        </form>
+        ) : (
+          <form
+            className="rounded-xl border border-input bg-background p-1.5 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25"
+            onSubmit={(event) => {
+              event.preventDefault()
+              sendMessage(draft)
+            }}
+          >
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault()
+                  sendMessage(draft)
+                }
+              }}
+              placeholder="Ask Nest anything…"
+              className="min-h-14 w-full resize-none bg-transparent px-2 py-1.5 text-xs leading-relaxed outline-none placeholder:text-muted-foreground"
+            />
+            <div className="flex items-end justify-between gap-2 px-0.5 pb-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                className="rounded-lg"
+                title="Attachments are not available yet"
+                aria-label="Attachments are not available yet"
+              >
+                <IconPaperclip />
+              </Button>
+              <Button
+                type={isBusy ? "button" : "submit"}
+                size="icon-sm"
+                className="rounded-full"
+                disabled={!isBusy && !draft.trim()}
+                onClick={
+                  isBusy
+                    ? () => {
+                        void agent.cancel().catch(() => {})
+                      }
+                    : undefined
+                }
+                title={isBusy ? "Stop response" : "Send message"}
+                aria-label={isBusy ? "Stop response" : "Send message"}
+              >
+                {isBusy ? <IconPlayerStop /> : <IconArrowUp />}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </aside>
   )
