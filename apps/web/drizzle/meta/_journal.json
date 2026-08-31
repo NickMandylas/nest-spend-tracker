@@ -50,6 +50,27 @@
       "when": 1787644621255,
       "tag": "0006_natural_nico_minoru",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788163916979,
+      "tag": "0007_slimy_mattie_franklin",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788168050745,
+      "tag": "0008_milky_alex_wilder",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788169906887,
+      "tag": "0009_third_shotgun",
+      "breakpoints": true
     }
   ]
 }

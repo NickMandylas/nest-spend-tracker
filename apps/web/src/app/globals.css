@@ -1,4 +1,6 @@
 @import "tailwindcss";
+
+@plugin "tailwind-scrollbar-hide";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "streamdown/styles.css";
@@ -431,6 +433,8 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-highlight: var(--highlight);
+  --color-brand: var(--brand);
 }
 
 :root {
@@ -466,6 +470,8 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.89 0 0);
   --sidebar-ring: oklch(0.64 0.18 151);
+  --highlight: oklch(0.852 0.199 91.936);
+  --brand: oklch(0.64 0.18 151);
 }
 
 .dark {
@@ -500,6 +506,8 @@
   --sidebar-accent-foreground: oklch(0.96 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.72 0.19 151);
+  --highlight: oklch(0.852 0.199 91.936);
+  --brand: oklch(0.72 0.19 151);
 }
 
 @layer base {

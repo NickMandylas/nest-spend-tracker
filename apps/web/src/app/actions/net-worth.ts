@@ -8,7 +8,6 @@ import type { NetWorthProfile } from "@/lib/net-worth-types"
 export type SaveNetWorthResult =
   { ok: true; profile: NetWorthProfile } | { ok: false; message: string }
 
-const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/
 const SUPER_ACCOUNT_IDS = ["super_account_1", "super_account_2"] as const
 const MAX_MONEY_MINOR = 100_000_000_000
 
@@ -23,14 +22,12 @@ function parseMoney(value: FormDataEntryValue | null) {
 export async function updateNetWorthProfile(
   formData: FormData
 ): Promise<SaveNetWorthResult> {
-  const propertyValueMinor = parseMoney(formData.get("propertyValue"))
   const monthlySuperContributionMinor = parseMoney(
     formData.get("monthlySuperContribution")
   )
-  const propertyValuedAt = String(formData.get("propertyValuedAt") ?? "")
   const taxPercent = Number(formData.get("superContributionTaxPercent"))
 
-  const moneyValues = [propertyValueMinor, monthlySuperContributionMinor]
+  const moneyValues = [monthlySuperContributionMinor]
 
   if (
     moneyValues.some(
@@ -42,10 +39,6 @@ export async function updateNetWorthProfile(
       ok: false,
       message: "Enter valid amounts between $0 and $1 billion.",
     }
-  }
-
-  if (!DATE_PATTERN.test(propertyValuedAt)) {
-    return { ok: false, message: "Choose a valid valuation date." }
   }
 
   if (!Number.isFinite(taxPercent) || taxPercent < 0 || taxPercent > 45) {
@@ -78,8 +71,6 @@ export async function updateNetWorthProfile(
   }
 
   const profile = saveNetWorthProfile({
-    propertyValueMinor,
-    propertyValuedAt,
     superAccounts,
     monthlySuperContributionMinor,
     superContributionTaxBps: Math.round(taxPercent * 100),

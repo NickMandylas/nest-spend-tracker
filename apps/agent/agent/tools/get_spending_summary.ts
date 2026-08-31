@@ -80,7 +80,10 @@ export default defineTool({
              transactions.date,
              transactions.description,
              transactions.amount_minor AS amountMinor,
-             transactions.provider_category AS providerCategory,
+             CASE
+               WHEN transactions.custom_category = 'UNCATEGORISED' THEN NULL
+               ELSE COALESCE(transactions.custom_category, transactions.provider_category)
+             END AS providerCategory,
              transactions.merchant_name AS merchantName,
              transactions.raw_transaction_json AS rawTransactionJson
            FROM bank_transactions AS transactions
@@ -90,7 +93,13 @@ export default defineTool({
              AND transactions.direction = 'debit'
              AND transactions.amount_minor < 0
              AND transactions.date BETWEEN ? AND ?
-             AND COALESCE(transactions.provider_category, '') NOT IN (
+             AND COALESCE(
+               CASE
+                 WHEN transactions.custom_category = 'UNCATEGORISED' THEN NULL
+                 ELSE COALESCE(transactions.custom_category, transactions.provider_category)
+               END,
+               ''
+             ) NOT IN (
                'INCOME', 'LOAN_PAYMENTS', 'TRANSFER_IN', 'TRANSFER_OUT'
              )
              AND transactions.description NOT LIKE '%settlement drawing%'

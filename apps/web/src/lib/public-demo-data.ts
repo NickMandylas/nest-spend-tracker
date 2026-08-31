@@ -291,10 +291,40 @@ export function getPublicDemoDashboard(): {
       apiVersion: "demo",
     },
     preferences: {
-      property: {
+      properties: [
+        {
+          id: "property_demo",
+          displayName: "42 Example Avenue",
+          propertyType: "residential",
+          address: "42 Example Avenue, Sampleton VIC 3000, Australia",
+          addressLine1: "42 Example Avenue",
+          suburb: "Sampleton",
+          state: "VIC",
+          postcode: "3000",
+          country: "Australia",
+          purchasePriceMinor: 76_000_000,
+          purchaseDate: "2021-04-16",
+          currentValueMinor: 98_000_000,
+          valuedAt: "2026-08-25",
+          valuationSource: "Illustrative estimate",
+          monthlyTakeHomeIncomeMinor: 1_250_000,
+        },
+      ],
+      primaryProperty: {
         id: "property_demo",
         displayName: "42 Example Avenue",
-        address: "42 Example Avenue, Sampleton VIC 3000",
+        propertyType: "residential",
+        address: "42 Example Avenue, Sampleton VIC 3000, Australia",
+        addressLine1: "42 Example Avenue",
+        suburb: "Sampleton",
+        state: "VIC",
+        postcode: "3000",
+        country: "Australia",
+        purchasePriceMinor: 76_000_000,
+        purchaseDate: "2021-04-16",
+        currentValueMinor: 98_000_000,
+        valuedAt: "2026-08-25",
+        valuationSource: "Illustrative estimate",
         monthlyTakeHomeIncomeMinor: 1_250_000,
       },
       accounts: {
@@ -335,14 +365,25 @@ export function getPublicDemoDashboard(): {
 
 export function getPublicDemoNetWorthProfile(): NetWorthProfile {
   return {
-    property: {
-      id: "property_demo",
-      displayName: "42 Example Avenue",
-      address: "42 Example Avenue, Sampleton VIC 3000",
-      valueMinor: 98_000_000,
-      valuedAt: "2026-08-25",
-      source: "Illustrative estimate",
-    },
+    properties: [
+      {
+        id: "property_demo",
+        displayName: "42 Example Avenue",
+        propertyType: "residential",
+        address: "42 Example Avenue, Sampleton VIC 3000, Australia",
+        addressLine1: "42 Example Avenue",
+        suburb: "Sampleton",
+        state: "VIC",
+        postcode: "3000",
+        country: "Australia",
+        purchasePriceMinor: 76_000_000,
+        purchaseDate: "2021-04-16",
+        currentValueMinor: 98_000_000,
+        valuedAt: "2026-08-25",
+        valuationSource: "Illustrative estimate",
+        monthlyTakeHomeIncomeMinor: 1_250_000,
+      },
+    ],
     items: [
       {
         id: "demo_retirement_a",

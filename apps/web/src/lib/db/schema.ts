@@ -11,6 +11,14 @@ export const properties = sqliteTable("properties", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull(),
   address: text("address").notNull(),
+  propertyType: text("property_type").notNull().default("residential"),
+  addressLine1: text("address_line_1"),
+  suburb: text("suburb"),
+  state: text("state"),
+  postcode: text("postcode"),
+  country: text("country").notNull().default("Australia"),
+  purchasePriceMinor: integer("purchase_price_minor"),
+  purchaseDate: text("purchase_date"),
   monthlyTakeHomeIncomeMinor: integer("monthly_take_home_income_minor"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
@@ -147,6 +155,8 @@ export const bankTransactions = sqliteTable(
     currency: text("currency"),
     direction: text("direction").notNull(),
     providerCategory: text("provider_category"),
+    customCategory: text("custom_category"),
+    noteMarkdown: text("note_markdown"),
     category: text("category"),
     merchantName: text("merchant_name"),
     merchantCategoryCode: text("merchant_category_code"),

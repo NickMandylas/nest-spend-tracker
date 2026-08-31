@@ -8,6 +8,7 @@ import {
   IconChevronUp,
   IconSelector,
   IconSearch,
+  IconNote,
 } from "@tabler/icons-react"
 
 import { InstitutionLogo } from "@/components/institution-logo"
@@ -176,6 +177,7 @@ export function ActivityDataTable({
       const searchableText = [
         merchantNameFor(transaction),
         transaction.description,
+        transaction.note_markdown ?? "",
         formatCategory(category),
         account ? accountLabel(account, preferences) : "",
       ]
@@ -461,12 +463,20 @@ export function ActivityDataTable({
                         src={merchantLogoFor(transaction)}
                       />
                       <div className="min-w-0">
-                        <p
-                          className="truncate text-xs font-semibold"
-                          title={transaction.description}
-                        >
-                          {merchant}
-                        </p>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <p
+                            className="truncate text-xs font-semibold"
+                            title={transaction.description}
+                          >
+                            {merchant}
+                          </p>
+                          {transaction.note_markdown ? (
+                            <IconNote
+                              className="size-3 shrink-0 text-primary"
+                              aria-label="Has note"
+                            />
+                          ) : null}
+                        </span>
                         <p className="mt-0.5 truncate text-[0.62rem] text-muted-foreground md:hidden">
                           {formatCategory(transaction.provider_category)}
                         </p>
@@ -589,7 +599,7 @@ export function ActivityDataTable({
           detailAccount
             ? (detailAccountPreference?.institutionName ??
               detailAccount.institution.name)
-            : "Bank of Melbourne"
+            : "Institution"
         }
         institutionLogo={
           detailAccount

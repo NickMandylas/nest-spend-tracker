@@ -7,6 +7,7 @@
     "dev": "eve dev",
     "build": "eve build",
     "info": "eve info",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

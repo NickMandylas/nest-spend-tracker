@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   IconArrowDownLeft,
   IconArrowUpRight,
+  IconChevronDown,
   IconDatabase,
   IconPhotoPlus,
   IconRefresh,
@@ -14,13 +15,29 @@ import {
 import {
   refreshTransactionDetails,
   removeTransactionMerchantLogo,
+  saveTransactionCategory,
   saveTransactionMerchantCustomisation,
 } from "@/app/actions/transactions"
+import { IconlyCategoryIcon } from "@/components/iconly-category-icon"
 import { InstitutionLogo } from "@/components/institution-logo"
 import { MerchantLogo } from "@/components/merchant-logo"
+import { TransactionNoteEditor } from "@/components/transaction-note-editor"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Sheet,
   SheetContent,
@@ -33,10 +50,13 @@ import {
   formatDateKey,
   formatMoney,
   getMerchantName,
+  TRANSACTION_CATEGORY_OPTIONS,
 } from "@/lib/finance"
 import { getMerchantIdentity } from "@/lib/merchant-identity"
 import type { AccountItem, Transaction } from "@/lib/redbark-types"
 import { transactionStatusClassName } from "@/lib/transaction-status"
+
+const BANK_CATEGORY_VALUE = "__BANK_CATEGORY__"
 
 function formatDateTime(
   date: string,
@@ -105,9 +125,12 @@ export function TransactionDetailsSheet({
 }) {
   const router = useRouter()
   const [isEditingLogo, setIsEditingLogo] = React.useState(false)
+  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = React.useState(false)
+  const [categoryError, setCategoryError] = React.useState<string | null>(null)
   const [logoError, setLogoError] = React.useState<string | null>(null)
   const [refreshError, setRefreshError] = React.useState<string | null>(null)
   const [isSavingLogo, startSavingLogo] = React.useTransition()
+  const [isSavingCategory, startSavingCategory] = React.useTransition()
   const [isRefreshing, startRefreshing] = React.useTransition()
   const logoFileId = React.useId()
 
@@ -115,6 +138,24 @@ export function TransactionDetailsSheet({
   const isCredit =
     transaction?.direction === "credit" ||
     (transaction?.amount?.amount ?? 0) > 0
+
+  function changeCategory(value: string) {
+    if (!transaction) return
+
+    setIsCategoryPickerOpen(false)
+    setCategoryError(null)
+    const category = value === BANK_CATEGORY_VALUE ? null : value
+    startSavingCategory(async () => {
+      const result = await saveTransactionCategory(transaction.id, category)
+      if (!result.ok) {
+        setCategoryError(result.message)
+        return
+      }
+
+      onTransactionChange(result.transaction)
+      router.refresh()
+    })
+  }
 
   function saveLogo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -435,7 +476,127 @@ export function TransactionDetailsSheet({
                   </DetailsRow>
                 )}
                 <DetailsRow label="Category">
-                  {formatCategory(transaction.provider_category)}
+                  <span className="flex flex-col items-end gap-1.5">
+                    <Popover
+                      open={isCategoryPickerOpen}
+                      onOpenChange={setIsCategoryPickerOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          role="combobox"
+                          aria-label="Transaction category"
+                          aria-expanded={isCategoryPickerOpen}
+                          className="h-7 w-[11.5rem] justify-between rounded-md bg-background px-2.5 text-[0.65rem] font-medium shadow-none"
+                          disabled={isSavingCategory}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <IconlyCategoryIcon
+                              category={
+                                transaction.custom_category ??
+                                transaction.bank_provider_category ??
+                                transaction.provider_category
+                              }
+                              className="size-3.5 shrink-0 text-muted-foreground"
+                            />
+                            <span className="truncate">
+                              {transaction.custom_category
+                                ? formatCategory(transaction.custom_category)
+                                : formatCategory(
+                                    transaction.bank_provider_category ??
+                                      transaction.provider_category
+                                  )}
+                            </span>
+                          </span>
+                          <IconChevronDown className="ml-2 size-3 shrink-0 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="w-60 gap-0 rounded-md p-0 shadow-none"
+                      >
+                        <Command>
+                          <CommandInput
+                            placeholder="Search categories…"
+                            autoFocus
+                          />
+                          <CommandList
+                            className="minimal-scrollbar max-h-60 overscroll-contain pr-1"
+                            onWheel={(event) => {
+                              event.stopPropagation()
+                              event.currentTarget.scrollTop += event.deltaY
+                            }}
+                          >
+                            <CommandEmpty>No category found.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value={`auto selected ${formatCategory(
+                                  transaction.bank_provider_category ??
+                                    transaction.provider_category
+                                )}`}
+                                data-checked={!transaction.custom_category}
+                                onSelect={() =>
+                                  changeCategory(BANK_CATEGORY_VALUE)
+                                }
+                              >
+                                <IconlyCategoryIcon
+                                  category={
+                                    transaction.bank_provider_category ??
+                                    transaction.provider_category
+                                  }
+                                  className="size-3.5 shrink-0 text-muted-foreground"
+                                />
+                                <span className="flex min-w-0 flex-col items-start leading-tight">
+                                  <span className="max-w-full truncate">
+                                    {formatCategory(
+                                      transaction.bank_provider_category ??
+                                        transaction.provider_category
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 text-[0.58rem] font-normal text-muted-foreground">
+                                    Auto-selected category
+                                  </span>
+                                </span>
+                              </CommandItem>
+                              {TRANSACTION_CATEGORY_OPTIONS.map((option) => (
+                                <CommandItem
+                                  key={option.value}
+                                  value={option.label}
+                                  data-checked={
+                                    transaction.custom_category === option.value
+                                  }
+                                  onSelect={() => changeCategory(option.value)}
+                                >
+                                  <IconlyCategoryIcon
+                                    category={option.value}
+                                    className="size-3.5 shrink-0 text-muted-foreground"
+                                  />
+                                  <span className="truncate">
+                                    {option.label}
+                                  </span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {isSavingCategory ? (
+                      <span className="text-[0.56rem] font-normal text-muted-foreground">
+                        Saving category…
+                      </span>
+                    ) : null}
+                    {categoryError ? (
+                      <span
+                        className="max-w-[12rem] text-[0.58rem] font-normal text-destructive"
+                        role="alert"
+                      >
+                        {categoryError}
+                      </span>
+                    ) : null}
+                  </span>
                 </DetailsRow>
                 <DetailsRow label="Direction">
                   <span className="capitalize">{transaction.direction}</span>
@@ -466,6 +627,12 @@ export function TransactionDetailsSheet({
                 {transaction.description}
               </p>
             </section>
+
+            <TransactionNoteEditor
+              key={transaction.id}
+              transaction={transaction}
+              onTransactionChange={onTransactionChange}
+            />
 
             <section
               className="rounded-lg border border-border px-3"

@@ -1,23 +1,100 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { randomUUID } from "node:crypto"
+import { asc, eq } from "drizzle-orm"
 
 import { getDatabase } from "@/lib/db"
-import { accountPreferences, properties } from "@/lib/db/schema"
-import type { DashboardPreferences } from "@/lib/preferences-types"
+import {
+  accountPreferences,
+  properties,
+  propertyValuations,
+} from "@/lib/db/schema"
+import type {
+  DashboardPreferences,
+  PropertyPreference,
+} from "@/lib/preferences-types"
 import type { AccountSnapshot } from "@/lib/redbark-types"
 
-export const PRIMARY_PROPERTY_ID = "property_351_moray_st"
-export const PRIMARY_PROPERTY_ADDRESS = "351 Moray St"
-export const PRIMARY_PROPERTY_FULL_ADDRESS =
-  "351 Moray Street, South Melbourne VIC 3205"
-export const PRIMARY_PROPERTY_LOAN_NAME = "Property Loan (351 Moray St)"
-export const MONTHLY_TAKE_HOME_INCOME_MINOR = 2_549_567
+export type PropertyDetailsInput = {
+  id?: string
+  displayName: string
+  propertyType: string
+  address: string
+  addressLine1: string
+  suburb: string
+  state: string
+  postcode: string
+  country: string
+  purchasePriceMinor: number | null
+  purchaseDate: string | null
+  currentValueMinor: number | null
+  valuedAt: string | null
+  valuationSource: string | null
+  monthlyTakeHomeIncomeMinor: number
+}
 
 function defaultDisplayName(account: AccountSnapshot["account"]) {
-  if (account.type === "loan") return PRIMARY_PROPERTY_LOAN_NAME
   if (account.name.toLowerCase().includes("offset")) return "Offset"
   return account.name
+}
+
+function structuredAddress(property: typeof properties.$inferSelect) {
+  if (
+    property.addressLine1 &&
+    (property.suburb ||
+      property.state ||
+      property.postcode ||
+      property.addressLine1 !== property.address)
+  ) {
+    return {
+      addressLine1: property.addressLine1,
+      suburb: property.suburb ?? "",
+      state: property.state ?? "",
+      postcode: property.postcode ?? "",
+    }
+  }
+
+  const australianAddress = property.address.match(
+    /^(.+?),\s*([^,]+?)\s+(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\s+(\d{4})(?:,\s*Australia)?$/i
+  )
+
+  return {
+    addressLine1:
+      australianAddress?.[1] ?? property.addressLine1 ?? property.address,
+    suburb: australianAddress?.[2] ?? property.suburb ?? "",
+    state: australianAddress?.[3]?.toUpperCase() ?? property.state ?? "",
+    postcode: australianAddress?.[4] ?? property.postcode ?? "",
+  }
+}
+
+export function getStoredProperties(): PropertyPreference[] {
+  return getDatabase()
+    .select({ property: properties, valuation: propertyValuations })
+    .from(properties)
+    .leftJoin(
+      propertyValuations,
+      eq(propertyValuations.propertyId, properties.id)
+    )
+    .orderBy(asc(properties.createdAt))
+    .all()
+    .map(({ property, valuation }) => {
+      const location = structuredAddress(property)
+
+      return {
+        id: property.id,
+        displayName: property.displayName,
+        propertyType: property.propertyType,
+        address: property.address,
+        ...location,
+        country: property.country,
+        purchasePriceMinor: property.purchasePriceMinor,
+        purchaseDate: property.purchaseDate,
+        currentValueMinor: valuation?.valueMinor ?? null,
+        valuedAt: valuation?.valuedAt ?? null,
+        valuationSource: valuation?.source ?? null,
+        monthlyTakeHomeIncomeMinor: property.monthlyTakeHomeIncomeMinor ?? 0,
+      }
+    })
 }
 
 export function ensureDashboardPreferences(
@@ -25,27 +102,6 @@ export function ensureDashboardPreferences(
 ): DashboardPreferences {
   const db = getDatabase()
   const now = new Date()
-
-  db.insert(properties)
-    .values({
-      id: PRIMARY_PROPERTY_ID,
-      displayName: PRIMARY_PROPERTY_ADDRESS,
-      address: PRIMARY_PROPERTY_ADDRESS,
-      monthlyTakeHomeIncomeMinor: MONTHLY_TAKE_HOME_INCOME_MINOR,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoNothing()
-    .run()
-
-  db.update(properties)
-    .set({
-      address: PRIMARY_PROPERTY_FULL_ADDRESS,
-      monthlyTakeHomeIncomeMinor: MONTHLY_TAKE_HOME_INCOME_MINOR,
-      updatedAt: now,
-    })
-    .where(eq(properties.id, PRIMARY_PROPERTY_ID))
-    .run()
 
   db.transaction((transaction) => {
     accounts.forEach(({ account }) => {
@@ -58,7 +114,7 @@ export function ensureDashboardPreferences(
           accountType: account.type,
           institutionName: account.institution.name,
           institutionLogo: account.institution.logo,
-          propertyId: account.type === "loan" ? PRIMARY_PROPERTY_ID : null,
+          propertyId: null,
           createdAt: now,
           updatedAt: now,
         })
@@ -76,23 +132,28 @@ export function ensureDashboardPreferences(
     })
   })
 
-  const property = db
-    .select()
-    .from(properties)
-    .where(eq(properties.id, PRIMARY_PROPERTY_ID))
-    .get()
-  const rows = db.select().from(accountPreferences).all()
+  const propertyRows = getStoredProperties()
+  const accountRows = db.select().from(accountPreferences).all()
+  const preferenceByAccount = new Map(
+    accountRows.map((row) => [row.accountId, row])
+  )
+  const linkedPrimaryId = accounts.find(({ account }) => {
+    const preference = preferenceByAccount.get(account.id)
+    return account.type === "loan" && preference?.propertyId
+  })?.account.id
+  const primaryPropertyId = linkedPrimaryId
+    ? preferenceByAccount.get(linkedPrimaryId)?.propertyId
+    : null
+  const primaryProperty =
+    propertyRows.find((property) => property.id === primaryPropertyId) ??
+    propertyRows[0] ??
+    null
 
   return {
-    property: {
-      id: property?.id ?? PRIMARY_PROPERTY_ID,
-      displayName: property?.displayName ?? PRIMARY_PROPERTY_ADDRESS,
-      address: property?.address ?? PRIMARY_PROPERTY_ADDRESS,
-      monthlyTakeHomeIncomeMinor:
-        property?.monthlyTakeHomeIncomeMinor ?? MONTHLY_TAKE_HOME_INCOME_MINOR,
-    },
+    properties: propertyRows,
+    primaryProperty,
     accounts: Object.fromEntries(
-      rows.map((row) => [
+      accountRows.map((row) => [
         row.accountId,
         {
           accountId: row.accountId,
@@ -106,6 +167,109 @@ export function ensureDashboardPreferences(
       ])
     ),
   }
+}
+
+export function savePropertyDetails(input: PropertyDetailsInput) {
+  const db = getDatabase()
+  const now = new Date()
+  const propertyId = input.id ?? `property_${randomUUID()}`
+  const existingValuation = db
+    .select({ loanBalanceMinor: propertyValuations.loanBalanceMinor })
+    .from(propertyValuations)
+    .where(eq(propertyValuations.propertyId, propertyId))
+    .get()
+
+  db.transaction((transaction) => {
+    transaction
+      .insert(properties)
+      .values({
+        id: propertyId,
+        displayName: input.displayName,
+        propertyType: input.propertyType,
+        address: input.address,
+        addressLine1: input.addressLine1,
+        suburb: input.suburb || null,
+        state: input.state || null,
+        postcode: input.postcode || null,
+        country: input.country,
+        purchasePriceMinor: input.purchasePriceMinor,
+        purchaseDate: input.purchaseDate,
+        monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: properties.id,
+        set: {
+          displayName: input.displayName,
+          propertyType: input.propertyType,
+          address: input.address,
+          addressLine1: input.addressLine1,
+          suburb: input.suburb || null,
+          state: input.state || null,
+          postcode: input.postcode || null,
+          country: input.country,
+          purchasePriceMinor: input.purchasePriceMinor,
+          purchaseDate: input.purchaseDate,
+          monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
+          updatedAt: now,
+        },
+      })
+      .run()
+
+    if (input.currentValueMinor !== null && input.valuedAt) {
+      transaction
+        .insert(propertyValuations)
+        .values({
+          id: `valuation_${propertyId}`,
+          propertyId,
+          valueMinor: input.currentValueMinor,
+          loanBalanceMinor: existingValuation?.loanBalanceMinor ?? 0,
+          valuedAt: input.valuedAt,
+          source: input.valuationSource || "Owner estimate",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: propertyValuations.propertyId,
+          set: {
+            valueMinor: input.currentValueMinor,
+            valuedAt: input.valuedAt,
+            source: input.valuationSource || "Owner estimate",
+            updatedAt: now,
+          },
+        })
+        .run()
+    }
+  })
+
+  return (
+    getStoredProperties().find((property) => property.id === propertyId) ?? null
+  )
+}
+
+export function assignAccountToProperty(
+  accountId: string,
+  propertyId: string | null
+) {
+  const db = getDatabase()
+
+  if (propertyId) {
+    const property = db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(eq(properties.id, propertyId))
+      .get()
+    if (!property) return false
+  }
+
+  const result = db
+    .update(accountPreferences)
+    .set({ propertyId, updatedAt: new Date() })
+    .where(eq(accountPreferences.accountId, accountId))
+    .run()
+
+  return result.changes > 0
 }
 
 export function renameConnectedAccount(accountId: string, displayName: string) {

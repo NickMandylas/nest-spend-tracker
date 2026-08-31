@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   IconAdjustmentsDollar,
   IconBuildingBank,
+  IconBuildingEstate,
   IconCheck,
   IconDatabase,
   IconDeviceDesktop,
-  IconHome,
   IconMoon,
   IconRefresh,
   IconSettings,
@@ -22,6 +23,7 @@ import {
   type BudgetCategoryOption,
 } from "@/components/budget-dialog"
 import { InstitutionLogo } from "@/components/institution-logo"
+import { PropertyAccountsManager } from "@/components/property-accounts-manager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,6 +50,12 @@ const SETTINGS_SECTIONS = [
     icon: IconSettings,
   },
   {
+    id: "properties",
+    label: "Properties",
+    description: "Homes and mortgages",
+    icon: IconBuildingEstate,
+  },
+  {
     id: "accounts",
     label: "Accounts",
     description: "Names and connections",
@@ -69,6 +77,10 @@ const SETTINGS_SECTIONS = [
 
 type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["id"]
 
+const subscribeToNothing = () => () => {}
+const getMountedSnapshot = () => true
+const getServerMountedSnapshot = () => false
+
 function monthLabel(month: string) {
   return new Intl.DateTimeFormat("en-AU", {
     month: "long",
@@ -77,12 +89,13 @@ function monthLabel(month: string) {
   }).format(new Date(`${month}-01T00:00:00Z`))
 }
 
-function GeneralSettings({
-  preferences,
-}: {
-  preferences: DashboardPreferences
-}) {
+function GeneralSettings() {
   const { theme, setTheme } = useTheme()
+  const mounted = React.useSyncExternalStore(
+    subscribeToNothing,
+    getMountedSnapshot,
+    getServerMountedSnapshot
+  )
   const themeOptions = [
     { value: "system", label: "System", icon: IconDeviceDesktop },
     { value: "light", label: "Light", icon: IconSun },
@@ -90,50 +103,7 @@ function GeneralSettings({
   ] as const
 
   return (
-    <div className="space-y-3">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Household</CardTitle>
-          <CardDescription>
-            The property and income assumptions used across Nest.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y divide-border rounded-lg bg-muted/45 px-3">
-            <div className="flex items-center justify-between gap-4 py-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="grid size-8 shrink-0 place-items-center rounded-md bg-background text-muted-foreground ring-1 ring-foreground/8">
-                  <IconHome className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium">Primary property</p>
-                  <p className="mt-0.5 truncate text-[0.65rem] text-muted-foreground">
-                    {preferences.property.address}
-                  </p>
-                </div>
-              </div>
-              <p className="shrink-0 text-xs font-medium">
-                {preferences.property.displayName}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-3">
-              <div>
-                <p className="text-xs font-medium">Monthly take-home income</p>
-                <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
-                  Used for offset and payoff forecasts.
-                </p>
-              </div>
-              <p className="shrink-0 font-mono text-xs font-semibold tabular-nums">
-                {formatMoney(
-                  preferences.property.monthlyTakeHomeIncomeMinor,
-                  true
-                )}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div>
       <Card size="sm">
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
@@ -144,7 +114,7 @@ function GeneralSettings({
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-3">
             {themeOptions.map((option) => {
-              const selected = theme === option.value
+              const selected = mounted && theme === option.value
 
               return (
                 <button
@@ -195,9 +165,7 @@ function AccountSettings({
           Rename accounts in Nest without changing their bank-side details.
         </CardDescription>
         <CardAction>
-          <Badge variant="outline">
-            {snapshot.accounts.length} connected
-          </Badge>
+          <Badge variant="outline">{snapshot.accounts.length} connected</Badge>
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -282,7 +250,10 @@ function BudgetSettings({
   categories: BudgetCategoryOption[]
   onSaved: (budgets: MonthlyBudgets) => void
 }) {
-  const spend = categories.reduce((total, category) => total + category.spent, 0)
+  const spend = categories.reduce(
+    (total, category) => total + category.spent,
+    0
+  )
   const totalProgress = budgets.total
     ? Math.min(100, Math.round((spend / budgets.total) * 100))
     : 0
@@ -347,7 +318,10 @@ function BudgetSettings({
                   : 0
 
                 return (
-                  <div key={category.category} className="py-3 first:pt-0 last:pb-0">
+                  <div
+                    key={category.category}
+                    className="py-3 first:pt-0 last:pb-0"
+                  >
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-xs font-medium">{category.label}</p>
                       <p className="font-mono text-[0.65rem] tabular-nums">
@@ -357,7 +331,9 @@ function BudgetSettings({
                         </span>
                       </p>
                     </div>
-                    {limit ? <Progress className="mt-2" value={progress} /> : null}
+                    {limit ? (
+                      <Progress className="mt-2" value={progress} />
+                    ) : null}
                   </div>
                 )
               })
@@ -415,7 +391,9 @@ function DataSettings({
         <CardContent>
           <div className="divide-y divide-border rounded-lg bg-muted/45 px-3">
             <div className="flex items-center justify-between gap-4 py-3">
-              <span className="text-xs text-muted-foreground">Last refresh</span>
+              <span className="text-xs text-muted-foreground">
+                Last refresh
+              </span>
               <span className="font-mono text-[0.68rem] font-medium tabular-nums">
                 {refreshedAt}
               </span>
@@ -489,8 +467,15 @@ export function SettingsPanel({
   refreshError: string | null
   onRefresh: () => void
 }) {
+  const searchParams = useSearchParams()
+  const requestedSection = searchParams.get("section")
+  const initialSection = SETTINGS_SECTIONS.some(
+    (section) => section.id === requestedSection
+  )
+    ? (requestedSection as SettingsSection)
+    : "general"
   const [activeSection, setActiveSection] =
-    React.useState<SettingsSection>("general")
+    React.useState<SettingsSection>(initialSection)
 
   return (
     <section className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
@@ -541,7 +526,12 @@ export function SettingsPanel({
 
         <div className="min-w-0 flex-1 p-3 sm:p-4 lg:p-5">
           {activeSection === "general" ? (
-            <GeneralSettings preferences={preferences} />
+            <GeneralSettings />
+          ) : activeSection === "properties" ? (
+            <PropertyAccountsManager
+              snapshot={snapshot}
+              preferences={preferences}
+            />
           ) : activeSection === "accounts" ? (
             <AccountSettings snapshot={snapshot} preferences={preferences} />
           ) : activeSection === "budgets" ? (

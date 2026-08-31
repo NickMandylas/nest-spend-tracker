@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  IconArrowUpRight,
   IconBuildingBank,
   IconBuildingEstate,
   IconCalendarStats,
@@ -12,9 +12,11 @@ import {
   IconInfoCircle,
   IconLink,
   IconLoader2,
+  IconMapPin,
   IconPigMoney,
   IconScale,
-  IconShieldCheck,
+  IconSettings,
+  IconUnlink,
   IconWallet,
 } from "@tabler/icons-react"
 
@@ -37,32 +39,11 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { formatCompactMoney, formatMoney } from "@/lib/finance"
 import type { NetWorthProfile } from "@/lib/net-worth-types"
-import type { DashboardPreferences } from "@/lib/preferences-types"
-import type { FinancialSnapshot } from "@/lib/redbark-types"
-
-const MARKET_SCENARIOS = [
-  {
-    label: "Conservative",
-    rate: 0.029,
-    note: "2026 year-to-date house movement",
-    source: "Heatmaps",
-    href: "https://heatmaps.com.au/suburbs/vic/south-melbourne-3205/",
-  },
-  {
-    label: "Current pace",
-    rate: 0.048,
-    note: "All houses, latest 12 months",
-    source: "realestate.com.au",
-    href: "https://www.realestate.com.au/vic/south-melbourne-3205/",
-  },
-  {
-    label: "Strong market",
-    rate: 0.108,
-    note: "Three-bedroom houses, latest 12 months",
-    source: "realestate.com.au",
-    href: "https://www.realestate.com.au/property/351-moray-st-south-melbourne-vic-3205/",
-  },
-] as const
+import type {
+  DashboardPreferences,
+  PropertyPreference,
+} from "@/lib/preferences-types"
+import type { AccountSnapshot, FinancialSnapshot } from "@/lib/redbark-types"
 
 function amountValue(amountMinor: number) {
   return (amountMinor / 100).toFixed(2)
@@ -76,7 +57,8 @@ function formatPercent(value: number, digits = 1) {
   return `${value.toFixed(digits)}%`
 }
 
-function formatValuationDate(date: string) {
+function formatDate(date: string | null) {
+  if (!date) return "Not dated"
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
     month: "short",
@@ -136,9 +118,9 @@ function MoneyInput({
     <div>
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={id}>{label}</Label>
-        {hint && (
+        {hint ? (
           <span className="text-[0.62rem] text-muted-foreground">{hint}</span>
-        )}
+        ) : null}
       </div>
       <div className="relative mt-1.5">
         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-muted-foreground">
@@ -163,15 +145,9 @@ function MoneyInput({
 
 function NetWorthSettingsDialog({
   profile,
-  propertyLoanBalanceMinor,
-  propertyLoanInstitutionName,
-  propertyLoanAccountNumber,
   onSaved,
 }: {
   profile: NetWorthProfile
-  propertyLoanBalanceMinor: number
-  propertyLoanInstitutionName: string
-  propertyLoanAccountNumber: string | null
   onSaved: (profile: NetWorthProfile) => void
 }) {
   const router = useRouter()
@@ -208,124 +184,74 @@ function NetWorthSettingsDialog({
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="lg" className="h-8">
           <IconEdit />
-          Edit assumptions
+          Edit super
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90svh] gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-xl">
         <DialogHeader className="border-b border-border p-4 pr-12">
-          <DialogTitle>Net worth assumptions</DialogTitle>
+          <DialogTitle>Super assumptions</DialogTitle>
           <DialogDescription>
-            Property value and super are saved locally. The property loan
-            updates from its connected bank account.
+            Property values and mortgage associations now live in Settings.
+            Super balances and contribution assumptions remain here.
           </DialogDescription>
         </DialogHeader>
 
         <form action={save} className="flex min-h-0 flex-col">
-          <div className="min-h-0 space-y-5 overflow-y-auto p-4">
-            <section>
-              <p className="text-[0.62rem] font-bold tracking-[0.16em] text-muted-foreground uppercase">
-                {profile.property.displayName}
-              </p>
-              <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                <MoneyInput
-                  id="property-value"
-                  name="propertyValue"
-                  label="Current value"
-                  defaultValue={profile.property.valueMinor}
-                />
+          <div className="min-h-0 space-y-3 overflow-y-auto p-4">
+            {superAccounts.map((account) => (
+              <div
+                key={account.id}
+                className="grid gap-2 rounded-lg bg-muted p-3 sm:grid-cols-[1fr_0.8fr]"
+              >
                 <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <Label>Loan balance</Label>
-                    <span className="inline-flex items-center gap-1 text-[0.62rem] font-medium text-primary">
-                      <IconLink className="size-3" />
-                      Linked
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex h-9 items-center rounded-md border border-border bg-muted px-3 font-mono text-sm font-medium tabular-nums">
-                    {formatMoney(propertyLoanBalanceMinor)}
-                  </div>
-                  <p className="mt-1 text-[0.6rem] text-muted-foreground">
-                    {propertyLoanInstitutionName}
-                    {propertyLoanAccountNumber
-                      ? ` · ${propertyLoanAccountNumber}`
-                      : ""}
-                  </p>
+                  <Label htmlFor={`super-name-${account.id}`}>Name</Label>
+                  <Input
+                    id={`super-name-${account.id}`}
+                    name={`superName:${account.id}`}
+                    defaultValue={account.displayName}
+                    maxLength={80}
+                    className="mt-1.5 h-9"
+                    required
+                  />
+                </div>
+                <MoneyInput
+                  id={`super-balance-${account.id}`}
+                  name={`superBalance:${account.id}`}
+                  label="Current balance"
+                  defaultValue={account.amountMinor}
+                />
+              </div>
+            ))}
+            <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+              <MoneyInput
+                id="monthly-super-contribution"
+                name="monthlySuperContribution"
+                label="Gross monthly contribution"
+                defaultValue={profile.settings.monthlySuperContributionMinor}
+                hint="Combined"
+              />
+              <div>
+                <Label htmlFor="super-tax-rate">Contribution tax</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    id="super-tax-rate"
+                    name="superContributionTaxPercent"
+                    type="number"
+                    min="0"
+                    max="45"
+                    step="0.01"
+                    defaultValue={(
+                      profile.settings.superContributionTaxBps / 100
+                    ).toFixed(2)}
+                    className="h-9 pr-7 font-mono tabular-nums"
+                    required
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                    %
+                  </span>
                 </div>
               </div>
-              <div className="mt-3">
-                <Label htmlFor="property-valued-at">Valuation date</Label>
-                <Input
-                  id="property-valued-at"
-                  name="propertyValuedAt"
-                  type="date"
-                  defaultValue={profile.property.valuedAt}
-                  className="mt-1.5 h-9"
-                  required
-                />
-              </div>
-            </section>
-
-            <section className="border-t border-border pt-5">
-              <p className="text-[0.62rem] font-bold tracking-[0.16em] text-muted-foreground uppercase">
-                Superannuation
-              </p>
-              <div className="mt-2 space-y-3">
-                {superAccounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="grid gap-2 rounded-lg bg-muted p-3 sm:grid-cols-[1fr_0.8fr]"
-                  >
-                    <div>
-                      <Label htmlFor={`super-name-${account.id}`}>Name</Label>
-                      <Input
-                        id={`super-name-${account.id}`}
-                        name={`superName:${account.id}`}
-                        defaultValue={account.displayName}
-                        maxLength={80}
-                        className="mt-1.5 h-9"
-                        required
-                      />
-                    </div>
-                    <MoneyInput
-                      id={`super-balance-${account.id}`}
-                      name={`superBalance:${account.id}`}
-                      label="Current balance"
-                      defaultValue={account.amountMinor}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <MoneyInput
-                  id="monthly-super-contribution"
-                  name="monthlySuperContribution"
-                  label="Gross monthly contribution"
-                  defaultValue={profile.settings.monthlySuperContributionMinor}
-                  hint="Combined"
-                />
-                <div>
-                  <Label htmlFor="super-tax-rate">Contribution tax</Label>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id="super-tax-rate"
-                      name="superContributionTaxPercent"
-                      type="number"
-                      min="0"
-                      max="45"
-                      step="0.01"
-                      defaultValue={(
-                        profile.settings.superContributionTaxBps / 100
-                      ).toFixed(2)}
-                      className="h-9 pr-7 font-mono tabular-nums"
-                      required
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-                      %
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </section>
+            </div>
           </div>
 
           <div className="border-t border-border p-4">
@@ -342,14 +268,113 @@ function NetWorthSettingsDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" size="lg" disabled={isPending}>
-                {isPending && <IconLoader2 className="animate-spin" />}
-                {isPending ? "Saving" : "Save net worth"}
+                {isPending ? <IconLoader2 className="animate-spin" /> : null}
+                {isPending ? "Saving" : "Save super"}
               </Button>
             </DialogFooter>
           </div>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+type PropertyPortfolioEntry = {
+  property: PropertyPreference
+  loans: AccountSnapshot[]
+  loanBalanceMinor: number
+  valueMinor: number
+  equityMinor: number
+}
+
+function PropertyCard({ entry }: { entry: PropertyPortfolioEntry }) {
+  const { property, loans, loanBalanceMinor, valueMinor, equityMinor } = entry
+  const ownershipPercent = valueMinor
+    ? (Math.max(0, equityMinor) / valueMinor) * 100
+    : 0
+
+  return (
+    <article className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <IconBuildingEstate className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-semibold">
+              {property.displayName}
+            </p>
+            <Badge variant="secondary" className="capitalize">
+              {property.propertyType}
+            </Badge>
+          </div>
+          <p className="mt-1 flex items-start gap-1.5 text-[0.65rem] leading-relaxed text-muted-foreground">
+            <IconMapPin className="mt-0.5 size-3 shrink-0" />
+            <span>{property.address}</span>
+          </p>
+        </div>
+        <Badge variant={loans.length ? "outline" : "secondary"}>
+          {loans.length ? `${loans.length} linked` : "No loan"}
+        </Badge>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-muted p-3">
+        <PropertyValue
+          label="Value"
+          value={valueMinor ? formatCompactMoney(valueMinor) : "Not set"}
+        />
+        <PropertyValue
+          label="Mortgage"
+          value={formatCompactMoney(loanBalanceMinor)}
+        />
+        <PropertyValue
+          label="Equity"
+          value={valueMinor ? formatCompactMoney(equityMinor) : "—"}
+          accent
+        />
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-1.5 flex items-center justify-between text-[0.62rem]">
+          <span className="text-muted-foreground">Owned equity</span>
+          <span className="font-mono font-semibold tabular-nums">
+            {valueMinor ? formatPercent(ownershipPercent) : "Not available"}
+          </span>
+        </div>
+        <Progress value={ownershipPercent} className="h-1.5" />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-[0.62rem] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <IconCalendarStats className="size-3" />
+          {property.currentValueMinor
+            ? `Valued ${formatDate(property.valuedAt)}`
+            : "No current valuation"}
+        </span>
+        <span>{property.valuationSource ?? "Add details in Settings"}</span>
+      </div>
+    </article>
+  )
+}
+
+function PropertyValue({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) {
+  return (
+    <div>
+      <p className="text-[0.58rem] text-muted-foreground">{label}</p>
+      <p
+        className={`mt-1 truncate font-mono text-xs font-semibold tabular-nums ${accent ? "text-primary" : ""}`}
+      >
+        {value}
+      </p>
+    </div>
   )
 }
 
@@ -363,68 +388,41 @@ export function NetWorthDashboard({
   initialProfile: NetWorthProfile
 }) {
   const [profile, setProfile] = React.useState(initialProfile)
-  const isDemoProfile = profile.property.id === "property_demo"
-  const propertyFacts = isDemoProfile
-    ? [
-        ["3", "Beds"],
-        ["2", "Baths"],
-        ["1", "Car"],
-        ["Demo", "Profile"],
-      ]
-    : [
-        ["3", "Beds"],
-        ["1", "Bath"],
-        ["2", "Cars"],
-        ["171m²", "Land"],
-      ]
+  const propertyIds = new Set(profile.properties.map((property) => property.id))
+  const loanAccounts = snapshot.accounts.filter(
+    ({ account }) => account.type === "loan"
+  )
+  const propertyPortfolio: PropertyPortfolioEntry[] = profile.properties.map(
+    (property) => {
+      const loans = loanAccounts.filter(
+        ({ account }) =>
+          preferences.accounts[account.id]?.propertyId === property.id
+      )
+      const loanBalanceMinor = sum(
+        loans.map(({ balance }) => Math.abs(balance?.current?.amount ?? 0))
+      )
+      const valueMinor = property.currentValueMinor ?? 0
 
-  const propertyLoanAccount =
-    snapshot.accounts.find(
-      ({ account }) =>
-        account.type === "loan" &&
-        preferences.accounts[account.id]?.propertyId === profile.property.id
-    ) ??
-    snapshot.accounts.find(
-      ({ account }) =>
-        account.type === "loan" &&
-        account.institution.name.toLowerCase() === "bank of melbourne"
-    )
-  const linkedLoanAmount = propertyLoanAccount?.balance?.current?.amount
-  const propertyLoanBalanceMinor =
-    typeof linkedLoanAmount === "number" ? Math.abs(linkedLoanAmount) : null
-  const propertyLoanInstitutionName =
-    propertyLoanAccount?.account.institution.name ?? "Bank of Melbourne"
-
-  if (propertyLoanBalanceMinor === null) {
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-            Net Worth
-          </h1>
-          <p className="mt-1 text-xs text-pretty text-muted-foreground">
-            Property equity, cash and retirement savings minus liabilities.
-          </p>
-        </div>
-        <article
-          className="flex gap-3 rounded-xl border border-border bg-card p-4 sm:p-5"
-          role="alert"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-            <IconBuildingBank className="size-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Loan balance unavailable</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Refresh banking data to reconnect the Bank of Melbourne property
-              loan before calculating net worth.
-            </p>
-          </div>
-        </article>
-      </div>
-    )
-  }
-
+      return {
+        property,
+        loans,
+        loanBalanceMinor,
+        valueMinor,
+        equityMinor: valueMinor - loanBalanceMinor,
+      }
+    }
+  )
+  const linkedLoanIds = new Set(
+    loanAccounts
+      .filter(({ account }) => {
+        const propertyId = preferences.accounts[account.id]?.propertyId
+        return propertyId ? propertyIds.has(propertyId) : false
+      })
+      .map(({ account }) => account.id)
+  )
+  const unlinkedLoans = loanAccounts.filter(
+    ({ account }) => !linkedLoanIds.has(account.id)
+  )
   const bankAssets = snapshot.accounts
     .filter(({ account, balance }) => {
       const current = balance?.current?.amount ?? 0
@@ -432,38 +430,40 @@ export function NetWorthDashboard({
     })
     .map(({ account, balance }) => ({
       id: account.id,
-      name:
-        preferences.accounts[account.id]?.displayName ??
-        (account.name.toLowerCase().includes("offset")
-          ? "Offset account"
-          : account.name),
+      name: preferences.accounts[account.id]?.displayName ?? account.name,
       institutionName: account.institution.name,
       institutionLogo: account.institution.logo,
       amountMinor: Math.max(0, balance?.current?.amount ?? 0),
     }))
-
   const manualAssets = profile.items.filter((item) => item.itemType === "asset")
   const manualLiabilities = profile.items.filter(
     (item) => item.itemType === "liability"
+  )
+
+  const propertyValueTotal = sum(
+    propertyPortfolio.map((entry) => entry.valueMinor)
+  )
+  const propertyLoanTotal = sum(
+    propertyPortfolio.map((entry) => entry.loanBalanceMinor)
+  )
+  const allLoanTotal = sum(
+    loanAccounts.map(({ balance }) => Math.abs(balance?.current?.amount ?? 0))
   )
   const bankAssetTotal = sum(bankAssets.map((asset) => asset.amountMinor))
   const manualAssetTotal = sum(manualAssets.map((asset) => asset.amountMinor))
   const manualLiabilityTotal = sum(
     manualLiabilities.map((liability) => liability.amountMinor)
   )
-  const totalAssets =
-    profile.property.valueMinor + bankAssetTotal + manualAssetTotal
-  const totalLiabilities = propertyLoanBalanceMinor + manualLiabilityTotal
+  const totalAssets = propertyValueTotal + bankAssetTotal + manualAssetTotal
+  const totalLiabilities = allLoanTotal + manualLiabilityTotal
   const netWorth = totalAssets - totalLiabilities
-  const propertyEquity = profile.property.valueMinor - propertyLoanBalanceMinor
-  const ownershipPercent =
-    profile.property.valueMinor > 0
-      ? (Math.max(0, propertyEquity) / profile.property.valueMinor) * 100
-      : 0
-  const lvr =
-    profile.property.valueMinor > 0
-      ? (propertyLoanBalanceMinor / profile.property.valueMinor) * 100
-      : 0
+  const propertyEquity = propertyValueTotal - propertyLoanTotal
+  const ownershipPercent = propertyValueTotal
+    ? (Math.max(0, propertyEquity) / propertyValueTotal) * 100
+    : 0
+  const lvr = propertyValueTotal
+    ? (propertyLoanTotal / propertyValueTotal) * 100
+    : 0
   const superAssets = manualAssets.filter(
     (item) => item.category === "superannuation"
   )
@@ -475,8 +475,7 @@ export function NetWorthDashboard({
   )
   const netMonthlySuper =
     profile.settings.monthlySuperContributionMinor - monthlySuperTax
-  const annualNetSuper = netMonthlySuper * 12
-  const oneYearSuper = superTotal + annualNetSuper
+  const oneYearSuper = superTotal + netMonthlySuper * 12
 
   return (
     <div className="space-y-4">
@@ -486,19 +485,68 @@ export function NetWorthDashboard({
             Net Worth
           </h1>
           <p className="mt-1 text-xs text-pretty text-muted-foreground">
-            Property equity, cash and retirement savings minus liabilities.
+            Live account balances combined with your saved property portfolio.
           </p>
         </div>
-        <NetWorthSettingsDialog
-          profile={profile}
-          propertyLoanBalanceMinor={propertyLoanBalanceMinor}
-          propertyLoanInstitutionName={propertyLoanInstitutionName}
-          propertyLoanAccountNumber={
-            propertyLoanAccount?.account.account_number ?? null
-          }
-          onSaved={setProfile}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            asChild
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-8"
+          >
+            <Link href="/settings?section=properties">
+              <IconSettings />
+              Manage properties
+            </Link>
+          </Button>
+          <NetWorthSettingsDialog profile={profile} onSaved={setProfile} />
+        </div>
       </div>
+
+      {!profile.properties.length ? (
+        <article className="flex flex-col gap-4 rounded-xl border border-dashed border-border bg-card p-5 sm:flex-row sm:items-center">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+            <IconBuildingEstate className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">No property portfolio yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Add a property and link its mortgage to include property equity in
+              this balance sheet.
+            </p>
+          </div>
+          <Button asChild size="lg">
+            <Link href="/settings?section=properties">Add property</Link>
+          </Button>
+        </article>
+      ) : null}
+
+      {unlinkedLoans.length ? (
+        <article className="flex gap-3 rounded-xl border border-border bg-card p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+            <IconUnlink className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">
+              {unlinkedLoans.length} mortgage{" "}
+              {unlinkedLoans.length === 1 ? "account is" : "accounts are"}{" "}
+              unlinked
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The debt is included in net worth, but it cannot be matched to a
+              property’s equity until you associate it in Settings.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/settings?section=properties">
+              <IconLink />
+              Link now
+            </Link>
+          </Button>
+        </article>
+      ) : null}
 
       <section
         className="grid gap-3 md:grid-cols-3"
@@ -522,7 +570,11 @@ export function NetWorthDashboard({
         <MetricCard
           label="Property equity"
           value={formatMoney(propertyEquity, true)}
-          detail={`${formatPercent(ownershipPercent)} owned · ${formatPercent(lvr)} LVR`}
+          detail={
+            propertyValueTotal
+              ? `${formatPercent(ownershipPercent)} owned · ${formatPercent(lvr)} LVR`
+              : "Add a valuation to calculate equity"
+          }
           icon={IconHomeDollar}
         >
           <Progress value={ownershipPercent} className="mt-4 h-1.5" />
@@ -544,322 +596,125 @@ export function NetWorthDashboard({
         </MetricCard>
       </section>
 
-      <section className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-        <article className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">Balance sheet</p>
-              <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
-                Connected account balances plus manually maintained assets.
-              </p>
-            </div>
-            <Badge variant="outline" className="font-mono tabular-nums">
-              {formatMoney(netWorth, true)} net
-            </Badge>
-          </div>
-
-          <div className="grid md:grid-cols-2">
-            <div className="border-b border-border md:border-r md:border-b-0">
-              <div className="flex items-center justify-between bg-muted/60 px-4 py-2.5">
-                <span className="text-[0.62rem] font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                  Assets
-                </span>
-                <span className="font-mono text-xs font-semibold tabular-nums">
-                  {formatMoney(totalAssets, true)}
-                </span>
-              </div>
-              <div className="divide-y divide-border">
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <IconBuildingEstate className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">
-                      {profile.property.displayName}
-                    </p>
-                    <p className="mt-0.5 text-[0.62rem] text-muted-foreground">
-                      Residential property
-                    </p>
-                  </div>
-                  <p className="font-mono text-xs font-semibold tabular-nums">
-                    {formatMoney(profile.property.valueMinor, true)}
-                  </p>
-                </div>
-                {bankAssets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <InstitutionLogo
-                      name={asset.institutionName}
-                      src={asset.institutionLogo}
-                      className="size-9 rounded-lg"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">
-                        {asset.name}
-                      </p>
-                      <p className="mt-0.5 text-[0.62rem] text-muted-foreground">
-                        {asset.institutionName} · cached balance
-                      </p>
-                    </div>
-                    <p className="font-mono text-xs font-semibold tabular-nums">
-                      {formatMoney(asset.amountMinor, true)}
-                    </p>
-                  </div>
-                ))}
-                {manualAssets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <span className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-                      {asset.category === "superannuation" ? (
-                        <IconPigMoney className="size-4" />
-                      ) : (
-                        <IconWallet className="size-4" />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">
-                        {asset.displayName}
-                      </p>
-                      <p className="mt-0.5 text-[0.62rem] text-muted-foreground capitalize">
-                        {asset.category}
-                      </p>
-                    </div>
-                    <p className="font-mono text-xs font-semibold tabular-nums">
-                      {formatMoney(asset.amountMinor, true)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between bg-muted/60 px-4 py-2.5">
-                <span className="text-[0.62rem] font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                  Liabilities
-                </span>
-                <span className="font-mono text-xs font-semibold tabular-nums">
-                  {formatMoney(totalLiabilities, true)}
-                </span>
-              </div>
-              <div className="divide-y divide-border">
-                <div className="flex items-center gap-3 px-4 py-3">
-                  {propertyLoanAccount ? (
-                    <InstitutionLogo
-                      name={propertyLoanInstitutionName}
-                      src={propertyLoanAccount.account.institution.logo}
-                      className="size-9 rounded-lg"
-                    />
-                  ) : (
-                    <span className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-                      <IconBuildingBank className="size-4" />
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">
-                      Property loan
-                    </p>
-                    <p className="mt-0.5 text-[0.62rem] text-muted-foreground">
-                      {propertyLoanInstitutionName} · linked balance
-                    </p>
-                  </div>
-                  <p className="font-mono text-xs font-semibold tabular-nums">
-                    {formatMoney(propertyLoanBalanceMinor, true)}
-                  </p>
-                </div>
-                {manualLiabilities.map((liability) => (
-                  <div
-                    key={liability.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <span className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-                      <IconWallet className="size-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">
-                        {liability.displayName}
-                      </p>
-                      <p className="mt-0.5 text-[0.62rem] text-muted-foreground capitalize">
-                        {liability.category}
-                      </p>
-                    </div>
-                    <p className="font-mono text-xs font-semibold tabular-nums">
-                      {formatMoney(liability.amountMinor, true)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">
-                {profile.property.displayName}
-              </p>
-              <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
-                {profile.property.address}
-              </p>
-            </div>
-            <Badge variant="outline">{profile.property.source}</Badge>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-2 rounded-lg bg-muted p-3">
-            <div>
-              <p className="text-[0.6rem] text-muted-foreground">Value</p>
-              <p className="mt-1 font-mono text-xs font-semibold tabular-nums">
-                {formatCompactMoney(profile.property.valueMinor)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[0.6rem] text-muted-foreground">Loan</p>
-              <p className="mt-1 font-mono text-xs font-semibold tabular-nums">
-                {formatCompactMoney(propertyLoanBalanceMinor)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[0.6rem] text-muted-foreground">Equity</p>
-              <p className="mt-1 font-mono text-xs font-semibold text-primary tabular-nums">
-                {formatCompactMoney(propertyEquity)}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-[0.62rem]">
-              <span className="text-muted-foreground">Owned equity</span>
-              <span className="font-mono font-semibold tabular-nums">
-                {formatPercent(ownershipPercent)}
-              </span>
-            </div>
-            <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-              <span
-                className="bg-primary"
-                style={{
-                  width: `${Math.max(0, Math.min(100, ownershipPercent))}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-4 gap-2 border-y border-border py-3 text-center">
-            {propertyFacts.map(([value, label]) => (
-              <div key={label}>
-                <p className="font-mono text-xs font-semibold">{value}</p>
-                <p className="mt-0.5 text-[0.58rem] text-muted-foreground">
-                  {label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex gap-2 rounded-lg bg-primary/8 p-3 text-[0.66rem] leading-relaxed text-muted-foreground">
-            <IconShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
-            {isDemoProfile ? (
-              <p>
-                This demonstration uses a fictional property and illustrative
-                value. Replace these assumptions with private household data
-                when running Nest locally.
-              </p>
-            ) : (
-              <p>
-                The $1.212m owner estimate sits within the April 2026
-                selling-agent guide of $1.20m–$1.32m. The property is also
-                covered by a heritage overlay, which can affect comparable-sale
-                assumptions.
-              </p>
-            )}
-          </div>
-
-          <p className="mt-3 text-[0.6rem] text-muted-foreground">
-            Valuation entered {formatValuationDate(profile.property.valuedAt)}.
-          </p>
-        </article>
-      </section>
-
-      <section className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-        <article className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">
-                {isDemoProfile
-                  ? "Illustrative property scenarios"
-                  : "South Melbourne scenarios"}
-              </p>
-              <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
-                One-year estimates applied to the{" "}
-                {formatCompactMoney(profile.property.valueMinor)} baseline.
-              </p>
-            </div>
-            <IconCalendarStats className="size-4 text-muted-foreground" />
-          </div>
-          <div className="divide-y divide-border">
-            {MARKET_SCENARIOS.map((scenario) => {
-              const projectedValue = Math.round(
-                profile.property.valueMinor * (1 + scenario.rate)
-              )
-              const projectedEquity = projectedValue - propertyLoanBalanceMinor
-
-              return (
-                <div
-                  key={scenario.label}
-                  className="grid gap-3 px-4 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-medium">{scenario.label}</p>
-                      <Badge variant="secondary" className="font-mono">
-                        +{formatPercent(scenario.rate * 100)}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-[0.62rem] text-muted-foreground">
-                      {scenario.note} ·{" "}
-                      <a
-                        href={scenario.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline decoration-border underline-offset-2 hover:text-foreground"
-                      >
-                        {scenario.source}
-                      </a>
-                    </p>
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-[0.58rem] text-muted-foreground uppercase">
-                      Projected value
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums">
-                      {formatMoney(projectedValue, true)}
-                    </p>
-                  </div>
-                  <div className="sm:w-28 sm:text-right">
-                    <p className="text-[0.58rem] text-muted-foreground uppercase">
-                      Equity
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs font-semibold text-primary tabular-nums">
-                      {formatMoney(projectedEquity, true)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div className="flex gap-2 border-t border-border bg-muted/50 px-4 py-2.5 text-[0.62rem] leading-relaxed text-muted-foreground">
-            <IconInfoCircle className="mt-0.5 size-3.5 shrink-0" />
-            <p>
-              Market-wide growth is a scenario input, not a property valuation.
-              {isDemoProfile
-                ? " Actual outcomes can differ materially from these illustrative figures."
-                : " Renovation potential, condition and the heritage overlay can create a material difference from suburb medians."}
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Balance sheet</p>
+            <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
+              Connected balances plus locally maintained property and super
+              values.
             </p>
           </div>
-        </article>
+          <Badge variant="outline" className="font-mono tabular-nums">
+            {formatMoney(netWorth, true)} net
+          </Badge>
+        </div>
 
+        <div className="grid md:grid-cols-2">
+          <BalanceColumn title="Assets" total={totalAssets}>
+            {propertyPortfolio.map(({ property, valueMinor }) => (
+              <BalanceRow
+                key={property.id}
+                icon={IconBuildingEstate}
+                name={property.displayName}
+                detail={property.address}
+                amountMinor={valueMinor}
+                accent
+              />
+            ))}
+            {bankAssets.map((asset) => (
+              <BalanceRow
+                key={asset.id}
+                logo={{
+                  name: asset.institutionName,
+                  src: asset.institutionLogo,
+                }}
+                name={asset.name}
+                detail={`${asset.institutionName} · live balance`}
+                amountMinor={asset.amountMinor}
+              />
+            ))}
+            {manualAssets.map((asset) => (
+              <BalanceRow
+                key={asset.id}
+                icon={
+                  asset.category === "superannuation"
+                    ? IconPigMoney
+                    : IconWallet
+                }
+                name={asset.displayName}
+                detail={asset.category}
+                amountMinor={asset.amountMinor}
+              />
+            ))}
+          </BalanceColumn>
+
+          <BalanceColumn title="Liabilities" total={totalLiabilities} bordered>
+            {loanAccounts.map(({ account, balance }) => {
+              const propertyId = preferences.accounts[account.id]?.propertyId
+              const linkedProperty = profile.properties.find(
+                (property) => property.id === propertyId
+              )
+              return (
+                <BalanceRow
+                  key={account.id}
+                  logo={{
+                    name: account.institution.name,
+                    src: account.institution.logo,
+                  }}
+                  name={
+                    preferences.accounts[account.id]?.displayName ??
+                    account.name
+                  }
+                  detail={
+                    linkedProperty
+                      ? `Linked to ${linkedProperty.displayName}`
+                      : "Unlinked loan"
+                  }
+                  amountMinor={Math.abs(balance?.current?.amount ?? 0)}
+                />
+              )
+            })}
+            {manualLiabilities.map((liability) => (
+              <BalanceRow
+                key={liability.id}
+                icon={IconWallet}
+                name={liability.displayName}
+                detail={liability.category}
+                amountMinor={liability.amountMinor}
+              />
+            ))}
+          </BalanceColumn>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Property portfolio</p>
+            <p className="mt-0.5 text-[0.65rem] text-muted-foreground">
+              Values, linked mortgages and equity by property.
+            </p>
+          </div>
+          <Badge variant="secondary">
+            {profile.properties.length}{" "}
+            {profile.properties.length === 1 ? "property" : "properties"}
+          </Badge>
+        </div>
+        {propertyPortfolio.length ? (
+          <div className="grid gap-3 xl:grid-cols-2">
+            {propertyPortfolio.map((entry) => (
+              <PropertyCard key={entry.property.id} entry={entry} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">
+            Property cards will appear after you add one in Settings.
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-[1fr_0.8fr]">
         <article className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -870,73 +725,137 @@ export function NetWorthDashboard({
             </div>
             <IconPigMoney className="size-4 text-muted-foreground" />
           </div>
-
           <div className="mt-4 divide-y divide-border border-y border-border">
-            <div className="flex items-center justify-between py-2.5 text-xs">
-              <span className="text-muted-foreground">Gross contribution</span>
-              <span className="font-mono font-semibold tabular-nums">
-                {formatMoney(profile.settings.monthlySuperContributionMinor)}
-                <span className="ml-1 font-sans text-[0.6rem] font-normal text-muted-foreground">
-                  /mo
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2.5 text-xs">
-              <span className="text-muted-foreground">
-                Contribution tax (
-                {formatPercent(profile.settings.superContributionTaxBps / 100)})
-              </span>
-              <span className="font-mono font-semibold tabular-nums">
-                −{formatMoney(monthlySuperTax)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2.5 text-xs">
-              <span className="font-medium">Net added to super</span>
-              <span className="font-mono font-semibold text-primary tabular-nums">
-                {formatMoney(netMonthlySuper)} /mo
-              </span>
-            </div>
+            <FlowRow
+              label="Gross contribution"
+              value={`${formatMoney(profile.settings.monthlySuperContributionMinor)} /mo`}
+            />
+            <FlowRow
+              label={`Contribution tax (${formatPercent(profile.settings.superContributionTaxBps / 100)})`}
+              value={`−${formatMoney(monthlySuperTax)}`}
+            />
+            <FlowRow
+              label="Net added to super"
+              value={`${formatMoney(netMonthlySuper)} /mo`}
+              accent
+            />
           </div>
+        </article>
 
-          <div className="mt-4 rounded-lg bg-muted p-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[0.65rem] text-muted-foreground">
-                Net annual contributions
-              </span>
-              <span className="font-mono text-xs font-semibold tabular-nums">
-                {formatMoney(annualNetSuper, true)}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <span className="text-[0.65rem] text-muted-foreground">
-                Balance after 12 months
-              </span>
-              <span className="font-mono text-xs font-semibold tabular-nums">
-                {formatMoney(oneYearSuper, true)}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 flex gap-2 text-[0.62rem] leading-relaxed text-muted-foreground">
-            <IconInfoCircle className="mt-0.5 size-3.5 shrink-0" />
-            <p>
-              $4,500 monthly is $54,000 combined annually. If split evenly, that
-              is $27,000 each—below the current $30,000 concessional cap, before
-              any other concessional contributions. Division 293 can add tax
-              when an individual threshold is exceeded.
+        <article className="flex gap-3 rounded-xl border border-border bg-card p-4">
+          <IconInfoCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-semibold">
+              How property debt is handled
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Property values come from your saved valuations. Mortgage balances
+              come from connected loan accounts and are counted once, even when
+              a loan is not yet associated with a property.
             </p>
           </div>
-          <a
-            href="https://www.ato.gov.au/individuals-and-families/super-for-individuals-and-families/super/growing-and-keeping-track-of-your-super/caps-limits-and-tax-on-super-contributions/division-293-tax-on-concessional-contributions-by-high-income-earners"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-[0.62rem] font-medium text-primary hover:underline"
-          >
-            Check ATO contribution tax guidance
-            <IconArrowUpRight className="size-3" />
-          </a>
         </article>
       </section>
+    </div>
+  )
+}
+
+function BalanceColumn({
+  title,
+  total,
+  bordered = false,
+  children,
+}: {
+  title: string
+  total: number
+  bordered?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={
+        bordered ? "border-t border-border md:border-t-0 md:border-l" : ""
+      }
+    >
+      <div className="flex items-center justify-between bg-muted/60 px-4 py-2.5">
+        <span className="text-[0.62rem] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+          {title}
+        </span>
+        <span className="font-mono text-xs font-semibold tabular-nums">
+          {formatMoney(total, true)}
+        </span>
+      </div>
+      <div className="divide-y divide-border">{children}</div>
+    </div>
+  )
+}
+
+function BalanceRow({
+  icon: Icon,
+  logo,
+  name,
+  detail,
+  amountMinor,
+  accent = false,
+}: {
+  icon?: React.ComponentType<{ className?: string }>
+  logo?: { name: string; src: string | null }
+  name: string
+  detail: string
+  amountMinor: number
+  accent?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      {logo ? (
+        <InstitutionLogo
+          name={logo.name}
+          src={logo.src}
+          className="size-9 rounded-lg"
+        />
+      ) : (
+        <span
+          className={`grid size-9 shrink-0 place-items-center rounded-lg ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+        >
+          {Icon ? (
+            <Icon className="size-4" />
+          ) : (
+            <IconBuildingBank className="size-4" />
+          )}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium">{name}</p>
+        <p className="mt-0.5 truncate text-[0.62rem] text-muted-foreground capitalize">
+          {detail}
+        </p>
+      </div>
+      <p className="font-mono text-xs font-semibold tabular-nums">
+        {formatMoney(amountMinor, true)}
+      </p>
+    </div>
+  )
+}
+
+function FlowRow({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between py-2.5 text-xs">
+      <span className={accent ? "font-medium" : "text-muted-foreground"}>
+        {label}
+      </span>
+      <span
+        className={`font-mono font-semibold tabular-nums ${accent ? "text-primary" : ""}`}
+      >
+        {value}
+      </span>
     </div>
   )
 }

@@ -4,16 +4,22 @@ import { cn } from "@/lib/utils"
 
 const CATEGORY_ICON_PATHS: Record<string, string> = {
   BANK_FEES: "/icons/categories/bank-fees.svg",
+  ENTERTAINMENT: "/icons/categories/entertainment.svg",
   FOOD_AND_DRINK: "/icons/categories/food.svg",
   FOOD_AND_DRINK_GROCERIES: "/icons/categories/groceries.svg",
-  GOVERNMENT_AND_NON_PROFIT: "/icons/categories/home-loan.svg",
+  GOVERNMENT_AND_NON_PROFIT: "/icons/categories/government.svg",
+  HOME_IMPROVEMENT: "/icons/categories/home-improvement.svg",
   INCOME: "/icons/categories/income.svg",
   LOAN_PAYMENTS: "/icons/categories/home-loan.svg",
+  MEDICAL: "/icons/categories/medical.svg",
   MERCHANDISE: "/icons/categories/shopping.svg",
   PERSONAL_CARE: "/icons/categories/personal-care.svg",
+  RENT_AND_UTILITIES: "/icons/categories/rent-and-utilities.svg",
   SERVICES: "/icons/categories/services.svg",
   TRANSFER_IN: "/icons/categories/transfer-in.svg",
   TRANSFER_OUT: "/icons/categories/transfer-out.svg",
+  TRANSPORTATION: "/icons/categories/transportation.svg",
+  TRAVEL: "/icons/categories/travel.svg",
   UNCATEGORISED: "/icons/categories/uncategorised.svg",
 }
 

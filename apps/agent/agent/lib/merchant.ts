@@ -3,7 +3,7 @@ type MerchantRule = {
   matchKey: string
 }
 
-function normalise(value: string) {
+export function normaliseMerchantText(value: string) {
   return value
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -33,10 +33,10 @@ export function merchantMatchKey(transaction: {
   }
 
   if (transaction.merchantName?.trim()) {
-    return `merchant_name:${normalise(transaction.merchantName)}`
+    return `merchant_name:${normaliseMerchantText(transaction.merchantName)}`
   }
 
-  return `description:${normalise(transaction.description)}`
+  return `description:${normaliseMerchantText(transaction.description)}`
 }
 
 export function merchantLabel(
@@ -53,4 +53,23 @@ export function merchantLabel(
     transaction.merchantName?.trim() ||
     transaction.description.replace(/\s+/g, " ").trim()
   )
+}
+
+export function merchantMatches(
+  transaction: {
+    description: string
+    merchantName: string | null
+    rawTransactionJson?: string
+  },
+  rules: Map<string, MerchantRule>,
+  query: string
+) {
+  const needle = normaliseMerchantText(query)
+  if (!needle) return true
+
+  return [
+    merchantLabel(transaction, rules),
+    transaction.merchantName ?? "",
+    transaction.description,
+  ].some((value) => normaliseMerchantText(value).includes(needle))
 }

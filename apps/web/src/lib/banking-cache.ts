@@ -9,11 +9,9 @@ import {
   bankingSyncs,
   connectedAccounts,
 } from "@/lib/db/schema"
+import { applyTransactionCategoryOverride } from "@/lib/finance"
 import { getFinancialSnapshot, RedbarkError } from "@/lib/redbark"
-import type {
-  FinancialSnapshot,
-  Transaction,
-} from "@/lib/redbark-types"
+import type { FinancialSnapshot, Transaction } from "@/lib/redbark-types"
 
 const REDBARK_SYNC_SOURCE = "redbark"
 
@@ -214,6 +212,8 @@ export function getCachedFinancialSnapshot(): FinancialSnapshot | null {
   const transactionsByAccount = new Map<string, Transaction[]>()
   db.select({
     accountId: bankTransactions.accountId,
+    customCategory: bankTransactions.customCategory,
+    noteMarkdown: bankTransactions.noteMarkdown,
     rawTransactionJson: bankTransactions.rawTransactionJson,
   })
     .from(bankTransactions)
@@ -223,7 +223,12 @@ export function getCachedFinancialSnapshot(): FinancialSnapshot | null {
       if (!transaction) return
 
       const transactions = transactionsByAccount.get(row.accountId) ?? []
-      transactions.push(transaction)
+      transactions.push(
+        applyTransactionCategoryOverride(
+          { ...transaction, note_markdown: row.noteMarkdown },
+          row.customCategory
+        )
+      )
       transactionsByAccount.set(row.accountId, transactions)
     })
 

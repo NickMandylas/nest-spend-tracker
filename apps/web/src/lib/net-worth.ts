@@ -2,17 +2,9 @@ import "server-only"
 
 import { asc, eq } from "drizzle-orm"
 
-import {
-  PRIMARY_PROPERTY_FULL_ADDRESS,
-  PRIMARY_PROPERTY_ID,
-} from "@/lib/account-preferences"
+import { getStoredProperties } from "@/lib/account-preferences"
 import { getDatabase } from "@/lib/db"
-import {
-  manualNetWorthItems,
-  netWorthSettings,
-  properties,
-  propertyValuations,
-} from "@/lib/db/schema"
+import { manualNetWorthItems, netWorthSettings } from "@/lib/db/schema"
 import type {
   NetWorthItemType,
   NetWorthProfile,
@@ -20,11 +12,7 @@ import type {
 } from "@/lib/net-worth-types"
 
 const HOUSEHOLD_SETTINGS_ID = "household"
-const PRIMARY_PROPERTY_VALUATION_ID = "valuation_351_moray_st"
 
-const DEFAULT_PROPERTY_VALUE_MINOR = 121_200_000
-const DEFAULT_PROPERTY_LOAN_BALANCE_MINOR = 95_621_400
-const DEFAULT_VALUED_AT = "2026-08-25"
 const DEFAULT_MONTHLY_SUPER_CONTRIBUTION_MINOR = 450_000
 const DEFAULT_SUPER_CONTRIBUTION_TAX_BPS = 1_500
 
@@ -50,20 +38,6 @@ function itemType(value: string): NetWorthItemType {
 export function ensureNetWorthProfile() {
   const db = getDatabase()
   const now = new Date()
-
-  db.insert(propertyValuations)
-    .values({
-      id: PRIMARY_PROPERTY_VALUATION_ID,
-      propertyId: PRIMARY_PROPERTY_ID,
-      valueMinor: DEFAULT_PROPERTY_VALUE_MINOR,
-      loanBalanceMinor: DEFAULT_PROPERTY_LOAN_BALANCE_MINOR,
-      valuedAt: DEFAULT_VALUED_AT,
-      source: "Owner estimate",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoNothing()
-    .run()
 
   db.insert(netWorthSettings)
     .values({
@@ -97,16 +71,6 @@ export function getNetWorthProfile(): NetWorthProfile {
   ensureNetWorthProfile()
 
   const db = getDatabase()
-  const property = db
-    .select()
-    .from(properties)
-    .where(eq(properties.id, PRIMARY_PROPERTY_ID))
-    .get()
-  const valuation = db
-    .select()
-    .from(propertyValuations)
-    .where(eq(propertyValuations.propertyId, PRIMARY_PROPERTY_ID))
-    .get()
   const settings = db
     .select()
     .from(netWorthSettings)
@@ -119,14 +83,7 @@ export function getNetWorthProfile(): NetWorthProfile {
     .all()
 
   return {
-    property: {
-      id: property?.id ?? PRIMARY_PROPERTY_ID,
-      displayName: property?.displayName ?? "351 Moray St",
-      address: property?.address ?? PRIMARY_PROPERTY_FULL_ADDRESS,
-      valueMinor: valuation?.valueMinor ?? DEFAULT_PROPERTY_VALUE_MINOR,
-      valuedAt: valuation?.valuedAt ?? DEFAULT_VALUED_AT,
-      source: valuation?.source ?? "Owner estimate",
-    },
+    properties: getStoredProperties(),
     items: items.map((item) => ({
       id: item.id,
       displayName: item.displayName,
@@ -148,40 +105,8 @@ export function getNetWorthProfile(): NetWorthProfile {
 export function saveNetWorthProfile(input: NetWorthProfileInput) {
   const db = getDatabase()
   const now = new Date()
-  const existingValuation = db
-    .select({ loanBalanceMinor: propertyValuations.loanBalanceMinor })
-    .from(propertyValuations)
-    .where(eq(propertyValuations.propertyId, PRIMARY_PROPERTY_ID))
-    .get()
 
   db.transaction((transaction) => {
-    transaction
-      .insert(propertyValuations)
-      .values({
-        id: PRIMARY_PROPERTY_VALUATION_ID,
-        propertyId: PRIMARY_PROPERTY_ID,
-        valueMinor: input.propertyValueMinor,
-        // Kept only because the legacy valuation table still requires it. The
-        // net worth page reads the linked bank account balance instead.
-        loanBalanceMinor:
-          existingValuation?.loanBalanceMinor ??
-          DEFAULT_PROPERTY_LOAN_BALANCE_MINOR,
-        valuedAt: input.propertyValuedAt,
-        source: "Owner estimate",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: propertyValuations.propertyId,
-        set: {
-          valueMinor: input.propertyValueMinor,
-          valuedAt: input.propertyValuedAt,
-          source: "Owner estimate",
-          updatedAt: now,
-        },
-      })
-      .run()
-
     transaction
       .insert(netWorthSettings)
       .values({

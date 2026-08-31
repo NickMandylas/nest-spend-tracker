@@ -951,9 +951,13 @@ export function SpendDashboard({
       account.type === "transaction" ||
       account.name.toLowerCase().includes("offset")
   )
-  const loanAccount = snapshot.accounts.find(
-    ({ account }) => account.type === "loan"
-  )
+  const primaryProperty = preferences.primaryProperty
+  const loanAccount =
+    snapshot.accounts.find(
+      ({ account }) =>
+        account.type === "loan" &&
+        preferences.accounts[account.id]?.propertyId === primaryProperty?.id
+    ) ?? snapshot.accounts.find(({ account }) => account.type === "loan")
   const offsetBalance = Math.max(
     0,
     offsetAccount?.balance?.current?.amount ?? 0
@@ -966,7 +970,7 @@ export function SpendDashboard({
     Number(loanDetails?.min_instalment_amount ?? 0) * 100
   )
   const expectedMonthlyExpenses = activeBudgets.total ?? projectedSpend
-  const monthlyTakeHomeIncome = preferences.property.monthlyTakeHomeIncomeMinor
+  const monthlyTakeHomeIncome = primaryProperty?.monthlyTakeHomeIncomeMinor ?? 0
   const expectedNextOffsetBalance =
     offsetBalance +
     monthlyTakeHomeIncome -
@@ -1905,14 +1909,14 @@ export function SpendDashboard({
                         Accounts
                       </p>
                       <h2 className="mt-1 text-xl font-semibold tracking-tight text-balance sm:text-2xl">
-                        Property loan and offset.
+                        Connected accounts.
                       </h2>
                     </div>
                     <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
                       <InstitutionLogo
                         name={
                           snapshot.accounts[0]?.account.institution.name ??
-                          "Bank of Melbourne"
+                          "Institution"
                         }
                         src={
                           snapshot.accounts[0]?.account.institution.logo ?? null
@@ -1954,7 +1958,7 @@ export function SpendDashboard({
             selectedOverviewAccount
               ? (selectedOverviewAccountPreference?.institutionName ??
                 selectedOverviewAccount.institution.name)
-              : "Bank of Melbourne"
+              : "Institution"
           }
           institutionLogo={
             selectedOverviewAccount

@@ -85,6 +85,9 @@ export type Transaction = {
   livemode: boolean
   custom_logo?: string | null
   custom_merchant_name?: string | null
+  custom_category?: string | null
+  bank_provider_category?: string | null
+  note_markdown?: string | null
 }
 
 export type RedbarkList<T> = {

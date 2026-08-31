@@ -27,16 +27,49 @@ const COMPACT_AUD_FORMATTER = new Intl.NumberFormat("en-AU", {
 
 const CATEGORY_LABELS: Record<string, string> = {
   BANK_FEES: "Bank fees",
+  ENTERTAINMENT: "Entertainment",
   FOOD_AND_DRINK: "Food & drink",
   FOOD_AND_DRINK_GROCERIES: "Groceries",
   GOVERNMENT_AND_NON_PROFIT: "Government",
+  HOME_IMPROVEMENT: "Home improvement",
   INCOME: "Income",
   LOAN_PAYMENTS: "Property loan",
+  MEDICAL: "Medical",
   MERCHANDISE: "Shopping",
   PERSONAL_CARE: "Personal care",
+  RENT_AND_UTILITIES: "Rent & utilities",
   SERVICES: "Services",
   TRANSFER_IN: "Transfer in",
   TRANSFER_OUT: "Transfer out",
+  TRANSPORTATION: "Transportation",
+  TRAVEL: "Travel",
+}
+
+export const UNCATEGORISED_CATEGORY = "UNCATEGORISED"
+
+export const TRANSACTION_CATEGORY_OPTIONS = [
+  ...Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
+  { value: UNCATEGORISED_CATEGORY, label: "Uncategorised" },
+].sort((left, right) => left.label.localeCompare(right.label, "en-AU"))
+
+export function applyTransactionCategoryOverride(
+  transaction: Transaction,
+  customCategory: string | null
+): Transaction {
+  const bankCategory =
+    transaction.bank_provider_category ?? transaction.provider_category
+
+  return {
+    ...transaction,
+    bank_provider_category: bankCategory,
+    custom_category: customCategory,
+    provider_category:
+      customCategory === null
+        ? bankCategory
+        : customCategory === UNCATEGORISED_CATEGORY
+          ? null
+          : customCategory,
+  }
 }
 
 const NON_SPEND_CATEGORIES = new Set([

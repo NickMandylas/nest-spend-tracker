@@ -1,3 +1,5 @@
+import type { PropertyPreference } from "@/lib/preferences-types"
+
 export type NetWorthItemType = "asset" | "liability"
 
 export type ManualNetWorthItem = {
@@ -10,14 +12,7 @@ export type ManualNetWorthItem = {
 }
 
 export type NetWorthProfile = {
-  property: {
-    id: string
-    displayName: string
-    address: string
-    valueMinor: number
-    valuedAt: string
-    source: string
-  }
+  properties: PropertyPreference[]
   items: ManualNetWorthItem[]
   settings: {
     monthlySuperContributionMinor: number
@@ -26,8 +21,6 @@ export type NetWorthProfile = {
 }
 
 export type NetWorthProfileInput = {
-  propertyValueMinor: number
-  propertyValuedAt: string
   superAccounts: Array<{
     id: string
     displayName: string

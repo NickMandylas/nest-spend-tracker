@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 
 import { getDatabase } from "@/lib/db"
 import { bankTransactions, merchantLogoRules } from "@/lib/db/schema"
+import { applyTransactionCategoryOverride } from "@/lib/finance"
 import { getMerchantIdentity } from "@/lib/merchant-identity"
 import type { FinancialSnapshot, Transaction } from "@/lib/redbark-types"
 
@@ -26,12 +27,23 @@ function parseStoredTransaction(value: string): Transaction | null {
 
 export function getStoredTransaction(transactionId: string) {
   const row = getDatabase()
-    .select({ rawTransactionJson: bankTransactions.rawTransactionJson })
+    .select({
+      customCategory: bankTransactions.customCategory,
+      noteMarkdown: bankTransactions.noteMarkdown,
+      rawTransactionJson: bankTransactions.rawTransactionJson,
+    })
     .from(bankTransactions)
     .where(eq(bankTransactions.transactionId, transactionId))
     .get()
 
-  return row ? parseStoredTransaction(row.rawTransactionJson) : null
+  if (!row) return null
+  const transaction = parseStoredTransaction(row.rawTransactionJson)
+  return transaction
+    ? applyTransactionCategoryOverride(
+        { ...transaction, note_markdown: row.noteMarkdown },
+        row.customCategory
+      )
+    : null
 }
 
 export function applyMerchantLogoRules(

@@ -17,17 +17,26 @@ type AccountRow = {
   currentAmountMinor: number | null
   displayName: string
   fetchedAt: string
+  propertyId: string | null
   rawDetailsJson: string | null
 }
 
 type PropertyRow = {
+  id: string
   address: string
+  addressLine1: string | null
+  country: string
   displayName: string
-  loanBalanceMinor: number
+  postcode: string | null
+  propertyType: string
+  purchaseDate: string | null
+  purchasePriceMinor: number | null
+  state: string | null
+  suburb: string | null
   monthlyTakeHomeIncomeMinor: number | null
-  source: string
-  valueMinor: number
-  valuedAt: string
+  source: string | null
+  valueMinor: number | null
+  valuedAt: string | null
 }
 
 type ManualItemRow = {
@@ -111,6 +120,7 @@ export default defineTool({
                'AUD'
              ) AS currency,
              balances.fetched_at AS fetchedAt,
+             preferences.property_id AS propertyId,
              connected.raw_details_json AS rawDetailsJson
            FROM connected_accounts AS connected
            JOIN ranked_balances AS balances
@@ -121,23 +131,30 @@ export default defineTool({
         )
         .all() as AccountRow[]
 
-      const property = database
+      const properties = database
         .prepare(
           `SELECT
+             properties.id AS id,
              properties.display_name AS displayName,
              properties.address AS address,
+             properties.property_type AS propertyType,
+             properties.address_line_1 AS addressLine1,
+             properties.suburb AS suburb,
+             properties.state AS state,
+             properties.postcode AS postcode,
+             properties.country AS country,
+             properties.purchase_price_minor AS purchasePriceMinor,
+             properties.purchase_date AS purchaseDate,
              properties.monthly_take_home_income_minor AS monthlyTakeHomeIncomeMinor,
              valuations.value_minor AS valueMinor,
-             valuations.loan_balance_minor AS loanBalanceMinor,
              valuations.valued_at AS valuedAt,
              valuations.source AS source
            FROM properties
-           JOIN property_valuations AS valuations
+           LEFT JOIN property_valuations AS valuations
              ON valuations.property_id = properties.id
-           ORDER BY valuations.valued_at DESC
-           LIMIT 1`
+           ORDER BY properties.created_at, properties.display_name`
         )
-        .get() as PropertyRow | undefined
+        .all() as PropertyRow[]
 
       const manualItems = database
         .prepare(
@@ -180,7 +197,13 @@ export default defineTool({
              AND transactions.direction = 'debit'
              AND transactions.amount_minor < 0
              AND transactions.date LIKE ?
-             AND COALESCE(transactions.provider_category, '') NOT IN (
+             AND COALESCE(
+               CASE
+                 WHEN transactions.custom_category = 'UNCATEGORISED' THEN NULL
+                 ELSE COALESCE(transactions.custom_category, transactions.provider_category)
+               END,
+               ''
+             ) NOT IN (
                'INCOME', 'LOAN_PAYMENTS', 'TRANSFER_IN', 'TRANSFER_OUT'
              )
              AND transactions.description NOT LIKE '%settlement drawing%'`
@@ -225,12 +248,13 @@ export default defineTool({
       const manualLiabilitiesMinor = manualItems
         .filter((item) => item.itemType === "liability")
         .reduce((total, item) => total + Math.abs(item.amountMinor), 0)
-      const propertyValueMinor = property?.valueMinor ?? 0
+      const propertyValueMinor = properties.reduce(
+        (total, property) => total + (property.valueMinor ?? 0),
+        0
+      )
       const totalAssetsMinor =
         propertyValueMinor + bankAssetsMinor + manualAssetsMinor
       const totalLiabilitiesMinor = bankLoanMinor + manualLiabilitiesMinor
-      const effectivePropertyLoanMinor =
-        bankLoanMinor || property?.loanBalanceMinor || 0
       const contributionTaxRate =
         (netWorthSettings?.superContributionTaxBps ?? 0) / 10_000
       const grossSuperContributionMinor =
@@ -247,6 +271,7 @@ export default defineTool({
           availableBalanceAud: minorToAud(account.availableAmountMinor),
           currency: account.currency.toUpperCase(),
           fetchedAt: account.fetchedAt,
+          propertyId: account.propertyId,
         })),
         spending: {
           month,
@@ -258,37 +283,59 @@ export default defineTool({
               ? null
               : minorToAud(totalBudget.amountMinor - spend.totalMinor),
         },
-        property: property
-          ? {
-              name: property.displayName,
-              address: property.address,
-              estimatedValueAud: minorToAud(property.valueMinor),
-              currentLoanBalanceAud: minorToAud(effectivePropertyLoanMinor),
-              equityAud: minorToAud(
-                property.valueMinor - effectivePropertyLoanMinor
-              ),
-              valuationDate: property.valuedAt,
-              valuationSource: property.source,
-              storedValuationLoanBalanceAud: minorToAud(
-                property.loanBalanceMinor
-              ),
-              monthlyTakeHomeIncomeAud: minorToAud(
-                property.monthlyTakeHomeIncomeMinor
-              ),
-            }
-          : null,
-        loan: (() => {
-          const loan = accounts.find(
-            (account) => account.accountType === "loan"
+        properties: properties.map((property) => {
+          const linkedLoans = accounts.filter(
+            (account) =>
+              account.accountType === "loan" &&
+              account.propertyId === property.id
           )
-          return loan
-            ? {
-                accountName: loan.displayName,
-                balanceAud: minorToAud(Math.abs(loan.currentAmountMinor ?? 0)),
-                ...loanDetails(loan.rawDetailsJson),
-              }
-            : null
-        })(),
+          const linkedLoanMinor = linkedLoans.reduce(
+            (total, account) =>
+              total + Math.abs(account.currentAmountMinor ?? 0),
+            0
+          )
+
+          return {
+            id: property.id,
+            name: property.displayName,
+            type: property.propertyType,
+            address: property.address,
+            location: {
+              addressLine1: property.addressLine1,
+              suburb: property.suburb,
+              state: property.state,
+              postcode: property.postcode,
+              country: property.country,
+            },
+            purchasePriceAud: minorToAud(property.purchasePriceMinor),
+            purchaseDate: property.purchaseDate,
+            estimatedValueAud: minorToAud(property.valueMinor),
+            currentLoanBalanceAud: minorToAud(linkedLoanMinor),
+            equityAud:
+              property.valueMinor === null
+                ? null
+                : minorToAud(property.valueMinor - linkedLoanMinor),
+            valuationDate: property.valuedAt,
+            valuationSource: property.source,
+            monthlyTakeHomeIncomeAud: minorToAud(
+              property.monthlyTakeHomeIncomeMinor
+            ),
+            loans: linkedLoans.map((loan) => ({
+              accountName: loan.displayName,
+              balanceAud: minorToAud(Math.abs(loan.currentAmountMinor ?? 0)),
+              ...loanDetails(loan.rawDetailsJson),
+            })),
+          }
+        }),
+        unlinkedLoans: accounts
+          .filter(
+            (account) => account.accountType === "loan" && !account.propertyId
+          )
+          .map((loan) => ({
+            accountName: loan.displayName,
+            balanceAud: minorToAud(Math.abs(loan.currentAmountMinor ?? 0)),
+            ...loanDetails(loan.rawDetailsJson),
+          })),
         manualNetWorthItems: manualItems.map((item) => ({
           name: item.displayName,
           type: item.itemType,

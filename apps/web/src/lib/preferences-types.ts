@@ -8,13 +8,27 @@ export type AccountPreference = {
   propertyId: string | null
 }
 
+export type PropertyPreference = {
+  id: string
+  displayName: string
+  propertyType: string
+  address: string
+  addressLine1: string
+  suburb: string
+  state: string
+  postcode: string
+  country: string
+  purchasePriceMinor: number | null
+  purchaseDate: string | null
+  currentValueMinor: number | null
+  valuedAt: string | null
+  valuationSource: string | null
+  monthlyTakeHomeIncomeMinor: number
+}
+
 export type DashboardPreferences = {
-  property: {
-    id: string
-    displayName: string
-    address: string
-    monthlyTakeHomeIncomeMinor: number
-  }
+  properties: PropertyPreference[]
+  primaryProperty: PropertyPreference | null
   accounts: Record<string, AccountPreference>
 }
 

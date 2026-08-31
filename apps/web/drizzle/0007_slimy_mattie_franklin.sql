@@ -1,0 +1,1 @@
+ALTER TABLE `bank_transactions` ADD `custom_category` text;
