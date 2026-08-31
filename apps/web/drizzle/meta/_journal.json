@@ -71,6 +71,13 @@
       "when": 1788169906887,
       "tag": "0009_third_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788178232079,
+      "tag": "0010_striped_harrier",
+      "breakpoints": true
     }
   ]
 }

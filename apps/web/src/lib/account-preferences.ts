@@ -1,11 +1,12 @@
 import "server-only"
 
 import { randomUUID } from "node:crypto"
-import { asc, eq } from "drizzle-orm"
+import { asc, eq, sql } from "drizzle-orm"
 
 import { getDatabase } from "@/lib/db"
 import {
   accountPreferences,
+  householdMembers,
   properties,
   propertyValuations,
 } from "@/lib/db/schema"
@@ -30,7 +31,27 @@ export type PropertyDetailsInput = {
   currentValueMinor: number | null
   valuedAt: string | null
   valuationSource: string | null
-  monthlyTakeHomeIncomeMinor: number
+}
+
+export function getHouseholdPreference() {
+  const members = getDatabase()
+    .select({
+      id: householdMembers.id,
+      displayName: householdMembers.displayName,
+      monthlyTakeHomeIncomeMinor: householdMembers.monthlyTakeHomeIncomeMinor,
+      sortOrder: householdMembers.sortOrder,
+    })
+    .from(householdMembers)
+    .orderBy(asc(householdMembers.sortOrder), asc(householdMembers.createdAt))
+    .all()
+
+  return {
+    members,
+    monthlyTakeHomeIncomeMinor: members.reduce(
+      (total, member) => total + member.monthlyTakeHomeIncomeMinor,
+      0
+    ),
+  }
 }
 
 function defaultDisplayName(account: AccountSnapshot["account"]) {
@@ -92,7 +113,6 @@ export function getStoredProperties(): PropertyPreference[] {
         currentValueMinor: valuation?.valueMinor ?? null,
         valuedAt: valuation?.valuedAt ?? null,
         valuationSource: valuation?.source ?? null,
-        monthlyTakeHomeIncomeMinor: property.monthlyTakeHomeIncomeMinor ?? 0,
       }
     })
 }
@@ -150,6 +170,7 @@ export function ensureDashboardPreferences(
     null
 
   return {
+    household: getHouseholdPreference(),
     properties: propertyRows,
     primaryProperty,
     accounts: Object.fromEntries(
@@ -194,7 +215,6 @@ export function savePropertyDetails(input: PropertyDetailsInput) {
         country: input.country,
         purchasePriceMinor: input.purchasePriceMinor,
         purchaseDate: input.purchaseDate,
-        monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
         createdAt: now,
         updatedAt: now,
       })
@@ -211,7 +231,6 @@ export function savePropertyDetails(input: PropertyDetailsInput) {
           country: input.country,
           purchasePriceMinor: input.purchasePriceMinor,
           purchaseDate: input.purchaseDate,
-          monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
           updatedAt: now,
         },
       })
@@ -246,6 +265,77 @@ export function savePropertyDetails(input: PropertyDetailsInput) {
   return (
     getStoredProperties().find((property) => property.id === propertyId) ?? null
   )
+}
+
+export function saveHouseholdMember(input: {
+  id?: string
+  displayName: string
+  monthlyTakeHomeIncomeMinor: number
+}) {
+  const db = getDatabase()
+  const now = new Date()
+  const memberId = input.id ?? `household_member_${randomUUID()}`
+  const sortOrder = input.id
+    ? undefined
+    : (db
+        .select({
+          value: sql<number>`coalesce(max(${householdMembers.sortOrder}), -1)`,
+        })
+        .from(householdMembers)
+        .get()?.value ?? -1) + 1
+
+  db.insert(householdMembers)
+    .values({
+      id: memberId,
+      displayName: input.displayName,
+      monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
+      sortOrder: sortOrder ?? 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: householdMembers.id,
+      set: {
+        displayName: input.displayName,
+        monthlyTakeHomeIncomeMinor: input.monthlyTakeHomeIncomeMinor,
+        updatedAt: now,
+      },
+    })
+    .run()
+
+  return getHouseholdPreference().members.find(
+    (member) => member.id === memberId
+  )
+}
+
+export function deleteHouseholdMember(memberId: string) {
+  return (
+    getDatabase()
+      .delete(householdMembers)
+      .where(eq(householdMembers.id, memberId))
+      .run().changes > 0
+  )
+}
+
+export function deletePropertyDetails(propertyId: string) {
+  const db = getDatabase()
+  const property = db
+    .select({ displayName: properties.displayName })
+    .from(properties)
+    .where(eq(properties.id, propertyId))
+    .get()
+  if (!property) return null
+
+  const linkedAccountCount =
+    db
+      .select({ value: sql<number>`count(*)` })
+      .from(accountPreferences)
+      .where(eq(accountPreferences.propertyId, propertyId))
+      .get()?.value ?? 0
+
+  db.delete(properties).where(eq(properties.id, propertyId)).run()
+
+  return { displayName: property.displayName, linkedAccountCount }
 }
 
 export function assignAccountToProperty(

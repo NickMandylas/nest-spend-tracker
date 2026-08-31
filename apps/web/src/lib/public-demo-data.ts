@@ -291,6 +291,23 @@ export function getPublicDemoDashboard(): {
       apiVersion: "demo",
     },
     preferences: {
+      household: {
+        members: [
+          {
+            id: "household_member_demo_alex",
+            displayName: "Alex",
+            monthlyTakeHomeIncomeMinor: 700_000,
+            sortOrder: 0,
+          },
+          {
+            id: "household_member_demo_jordan",
+            displayName: "Jordan",
+            monthlyTakeHomeIncomeMinor: 550_000,
+            sortOrder: 1,
+          },
+        ],
+        monthlyTakeHomeIncomeMinor: 1_250_000,
+      },
       properties: [
         {
           id: "property_demo",
@@ -307,7 +324,6 @@ export function getPublicDemoDashboard(): {
           currentValueMinor: 98_000_000,
           valuedAt: "2026-08-25",
           valuationSource: "Illustrative estimate",
-          monthlyTakeHomeIncomeMinor: 1_250_000,
         },
       ],
       primaryProperty: {
@@ -325,7 +341,6 @@ export function getPublicDemoDashboard(): {
         currentValueMinor: 98_000_000,
         valuedAt: "2026-08-25",
         valuationSource: "Illustrative estimate",
-        monthlyTakeHomeIncomeMinor: 1_250_000,
       },
       accounts: {
         [offsetAccount.id]: {
@@ -381,7 +396,6 @@ export function getPublicDemoNetWorthProfile(): NetWorthProfile {
         currentValueMinor: 98_000_000,
         valuedAt: "2026-08-25",
         valuationSource: "Illustrative estimate",
-        monthlyTakeHomeIncomeMinor: 1_250_000,
       },
     ],
     items: [

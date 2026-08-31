@@ -23,6 +23,7 @@ import {
   type BudgetCategoryOption,
 } from "@/components/budget-dialog"
 import { InstitutionLogo } from "@/components/institution-logo"
+import { HouseholdIncomeManager } from "@/components/household-income-manager"
 import { PropertyAccountsManager } from "@/components/property-accounts-manager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -89,7 +90,11 @@ function monthLabel(month: string) {
   }).format(new Date(`${month}-01T00:00:00Z`))
 }
 
-function GeneralSettings() {
+function GeneralSettings({
+  preferences,
+}: {
+  preferences: DashboardPreferences
+}) {
   const { theme, setTheme } = useTheme()
   const mounted = React.useSyncExternalStore(
     subscribeToNothing,
@@ -103,7 +108,8 @@ function GeneralSettings() {
   ] as const
 
   return (
-    <div>
+    <div className="space-y-3">
+      <HouseholdIncomeManager initialHousehold={preferences.household} />
       <Card size="sm">
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
@@ -526,7 +532,7 @@ export function SettingsPanel({
 
         <div className="min-w-0 flex-1 p-3 sm:p-4 lg:p-5">
           {activeSection === "general" ? (
-            <GeneralSettings />
+            <GeneralSettings preferences={preferences} />
           ) : activeSection === "properties" ? (
             <PropertyAccountsManager
               snapshot={snapshot}

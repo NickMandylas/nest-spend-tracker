@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import {
   assignAccountToProperty,
+  deletePropertyDetails,
   savePropertyDetails,
 } from "@/lib/account-preferences"
 import type { PropertyPreference } from "@/lib/preferences-types"
@@ -24,6 +25,15 @@ export type SavePropertyResult =
 
 export type AssignPropertyResult =
   | { ok: true; accountId: string; propertyId: string | null }
+  | { ok: false; message: string }
+
+export type DeletePropertyResult =
+  | {
+      ok: true
+      propertyId: string
+      displayName: string
+      unlinkedAccountCount: number
+    }
   | { ok: false; message: string }
 
 function field(formData: FormData, name: string) {
@@ -61,8 +71,6 @@ export async function saveProperty(
   const country = field(formData, "country") || "Australia"
   const purchasePriceMinor = optionalMoney(formData, "purchasePrice")
   const currentValueMinor = optionalMoney(formData, "currentValue")
-  const monthlyTakeHomeIncomeMinor =
-    optionalMoney(formData, "monthlyTakeHomeIncome") ?? 0
   const purchaseDate = field(formData, "purchaseDate") || null
   const valuedAt = field(formData, "valuedAt") || null
   const valuationSource = field(formData, "valuationSource") || null
@@ -86,7 +94,7 @@ export async function saveProperty(
     return { ok: false, message: "Add a valid country." }
   }
   if (
-    [purchasePriceMinor, currentValueMinor, monthlyTakeHomeIncomeMinor].some(
+    [purchasePriceMinor, currentValueMinor].some(
       (amount) =>
         amount !== null &&
         (!Number.isFinite(amount) || amount < 0 || amount > MAX_MONEY_MINOR)
@@ -128,7 +136,6 @@ export async function saveProperty(
     currentValueMinor,
     valuedAt,
     valuationSource,
-    monthlyTakeHomeIncomeMinor,
   })
 
   if (!property) {
@@ -137,6 +144,28 @@ export async function saveProperty(
 
   revalidateHousehold()
   return { ok: true, property }
+}
+
+export async function deleteProperty(
+  formData: FormData
+): Promise<DeletePropertyResult> {
+  const propertyId = field(formData, "propertyId")
+  if (!propertyId) {
+    return { ok: false, message: "This property could not be identified." }
+  }
+
+  const deleted = deletePropertyDetails(propertyId)
+  if (!deleted) {
+    return { ok: false, message: "The property was not found." }
+  }
+
+  revalidateHousehold()
+  return {
+    ok: true,
+    propertyId,
+    displayName: deleted.displayName,
+    unlinkedAccountCount: deleted.linkedAccountCount,
+  }
 }
 
 export async function setAccountProperty(

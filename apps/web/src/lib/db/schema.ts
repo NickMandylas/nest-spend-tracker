@@ -28,6 +28,25 @@ export const properties = sqliteTable("properties", {
     .default(sql`(unixepoch() * 1000)`),
 })
 
+export const householdMembers = sqliteTable(
+  "household_members",
+  {
+    id: text("id").primaryKey(),
+    displayName: text("display_name").notNull(),
+    monthlyTakeHomeIncomeMinor: integer(
+      "monthly_take_home_income_minor"
+    ).notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("household_members_sort_order_idx").on(table.sortOrder)]
+)
+
 export const accountPreferences = sqliteTable("account_preferences", {
   accountId: text("account_id").primaryKey(),
   displayName: text("display_name").notNull(),

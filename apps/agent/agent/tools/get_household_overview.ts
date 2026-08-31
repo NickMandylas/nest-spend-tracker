@@ -33,10 +33,14 @@ type PropertyRow = {
   purchasePriceMinor: number | null
   state: string | null
   suburb: string | null
-  monthlyTakeHomeIncomeMinor: number | null
   source: string | null
   valueMinor: number | null
   valuedAt: string | null
+}
+
+type HouseholdMemberRow = {
+  displayName: string
+  monthlyTakeHomeIncomeMinor: number
 }
 
 type ManualItemRow = {
@@ -95,7 +99,7 @@ function loanDetails(rawDetailsJson: string | null) {
 
 export default defineTool({
   description:
-    "Get the latest read-only household overview: cached account balances, this month's spending and budget, property value and equity, loan details, superannuation, and net worth.",
+    "Get the latest read-only household overview: household member income, cached account balances, this month's spending and budget, property value and equity, loan details, superannuation, and net worth.",
   inputSchema: z.object({}),
   execute() {
     return withReadOnlyDatabase((database) => {
@@ -145,7 +149,6 @@ export default defineTool({
              properties.country AS country,
              properties.purchase_price_minor AS purchasePriceMinor,
              properties.purchase_date AS purchaseDate,
-             properties.monthly_take_home_income_minor AS monthlyTakeHomeIncomeMinor,
              valuations.value_minor AS valueMinor,
              valuations.valued_at AS valuedAt,
              valuations.source AS source
@@ -155,6 +158,16 @@ export default defineTool({
            ORDER BY properties.created_at, properties.display_name`
         )
         .all() as PropertyRow[]
+
+      const householdMembers = database
+        .prepare(
+          `SELECT
+             display_name AS displayName,
+             monthly_take_home_income_minor AS monthlyTakeHomeIncomeMinor
+           FROM household_members
+           ORDER BY sort_order, created_at`
+        )
+        .all() as HouseholdMemberRow[]
 
       const manualItems = database
         .prepare(
@@ -283,6 +296,20 @@ export default defineTool({
               ? null
               : minorToAud(totalBudget.amountMinor - spend.totalMinor),
         },
+        householdIncome: {
+          members: householdMembers.map((member) => ({
+            name: member.displayName,
+            monthlyTakeHomeIncomeAud: minorToAud(
+              member.monthlyTakeHomeIncomeMinor
+            ),
+          })),
+          totalMonthlyTakeHomeIncomeAud: minorToAud(
+            householdMembers.reduce(
+              (total, member) => total + member.monthlyTakeHomeIncomeMinor,
+              0
+            )
+          ),
+        },
         properties: properties.map((property) => {
           const linkedLoans = accounts.filter(
             (account) =>
@@ -317,9 +344,6 @@ export default defineTool({
                 : minorToAud(property.valueMinor - linkedLoanMinor),
             valuationDate: property.valuedAt,
             valuationSource: property.source,
-            monthlyTakeHomeIncomeAud: minorToAud(
-              property.monthlyTakeHomeIncomeMinor
-            ),
             loans: linkedLoans.map((loan) => ({
               accountName: loan.displayName,
               balanceAud: minorToAud(Math.abs(loan.currentAmountMinor ?? 0)),

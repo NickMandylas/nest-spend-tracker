@@ -12,11 +12,28 @@ import {
   IconMapPin,
   IconPlus,
   IconReceiptDollar,
+  IconTrash,
   IconUnlink,
 } from "@tabler/icons-react"
 
-import { saveProperty, setAccountProperty } from "@/app/actions/properties"
+import {
+  deleteProperty,
+  saveProperty,
+  setAccountProperty,
+} from "@/app/actions/properties"
 import { InstitutionLogo } from "@/components/institution-logo"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -286,16 +303,6 @@ function PropertyDialog({
                 />
               </div>
             </section>
-
-            <section className="border-t border-border pt-5">
-              <MoneyField
-                id={`income-${property?.id ?? "new"}`}
-                name="monthlyTakeHomeIncome"
-                label="Monthly household take-home income"
-                defaultValue={property?.monthlyTakeHomeIncomeMinor ?? 0}
-                hint="Used by the mortgage forecast when this is the primary linked property."
-              />
-            </section>
           </div>
 
           <div className="border-t border-border p-4">
@@ -366,6 +373,93 @@ function MoneyField({
   )
 }
 
+function DeletePropertyDialog({
+  property,
+  linkedLoanCount,
+  onDeleted,
+}: {
+  property: PropertyPreference
+  linkedLoanCount: number
+  onDeleted: (propertyId: string) => void
+}) {
+  const router = useRouter()
+  const [open, setOpen] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [isPending, startTransition] = React.useTransition()
+
+  function remove(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    setError(null)
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.set("propertyId", property.id)
+      const result = await deleteProperty(formData)
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+
+      onDeleted(result.propertyId)
+      setOpen(false)
+      router.refresh()
+    })
+  }
+
+  const mortgageCopy = linkedLoanCount
+    ? `${linkedLoanCount} linked ${linkedLoanCount === 1 ? "mortgage" : "mortgages"} will remain connected but become unlinked.`
+    : "No connected mortgages are linked to it."
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (nextOpen) setError(null)
+      }}
+    >
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          aria-label={`Delete ${property.displayName}`}
+          className="text-muted-foreground hover:border-destructive/30 hover:text-destructive"
+        >
+          <IconTrash />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogMedia className="bg-destructive/10 text-destructive">
+            <IconTrash />
+          </AlertDialogMedia>
+          <AlertDialogTitle>Delete {property.displayName}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Its saved details and valuation will be permanently removed.{" "}
+            {mortgageCopy}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {error ? (
+          <p className="text-xs text-destructive" aria-live="polite">
+            {error}
+          </p>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={remove}
+            disabled={isPending}
+          >
+            {isPending ? <IconLoader2 className="animate-spin" /> : null}
+            {isPending ? "Deleting" : "Delete property"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 function DateField({
   id,
   name,
@@ -431,6 +525,20 @@ export function PropertyAccountsManager({
         ? current.map((item) => (item.id === property.id ? property : item))
         : [...current, property]
     })
+  }
+
+  function propertyDeleted(propertyId: string) {
+    setProperties((current) =>
+      current.filter((property) => property.id !== propertyId)
+    )
+    setPropertyByAccount((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([accountId, linkedPropertyId]) => [
+          accountId,
+          linkedPropertyId === propertyId ? null : linkedPropertyId,
+        ])
+      )
+    )
   }
 
   function assign(accountId: string, propertyId: string) {
@@ -524,10 +632,17 @@ export function PropertyAccountsManager({
                           <span>{property.address}</span>
                         </p>
                       </div>
-                      <PropertyDialog
-                        property={property}
-                        onSaved={propertySaved}
-                      />
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <PropertyDialog
+                          property={property}
+                          onSaved={propertySaved}
+                        />
+                        <DeletePropertyDialog
+                          property={property}
+                          linkedLoanCount={linkedLoans.length}
+                          onDeleted={propertyDeleted}
+                        />
+                      </div>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-2">

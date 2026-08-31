@@ -23,10 +23,22 @@ export type PropertyPreference = {
   currentValueMinor: number | null
   valuedAt: string | null
   valuationSource: string | null
+}
+
+export type HouseholdMemberPreference = {
+  id: string
+  displayName: string
+  monthlyTakeHomeIncomeMinor: number
+  sortOrder: number
+}
+
+export type HouseholdPreference = {
+  members: HouseholdMemberPreference[]
   monthlyTakeHomeIncomeMinor: number
 }
 
 export type DashboardPreferences = {
+  household: HouseholdPreference
   properties: PropertyPreference[]
   primaryProperty: PropertyPreference | null
   accounts: Record<string, AccountPreference>

@@ -970,7 +970,7 @@ export function SpendDashboard({
     Number(loanDetails?.min_instalment_amount ?? 0) * 100
   )
   const expectedMonthlyExpenses = activeBudgets.total ?? projectedSpend
-  const monthlyTakeHomeIncome = primaryProperty?.monthlyTakeHomeIncomeMinor ?? 0
+  const monthlyTakeHomeIncome = preferences.household.monthlyTakeHomeIncomeMinor
   const expectedNextOffsetBalance =
     offsetBalance +
     monthlyTakeHomeIncome -
